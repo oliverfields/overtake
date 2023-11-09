@@ -185,13 +185,39 @@ edit()
 
   git_pull
 
-  # THANK YOU xhienne! https://unix.stackexchange.com/a/388012
-  result="$(gpg --quiet --recipient "$PASSWORD_STORE_KEY" --decrypt "$file" || exit 1)" \
-    && result="$(vipe 2> /dev/null < <(printf '%s' "$result") || exit 1)" \
-    && gpg --recipient "$PASSWORD_STORE_KEY" --encrypt > "$file" < <(printf "%s" "$result")
-  unset result
+  edit_encrypted_file "$file"
 
   git_commit_all
+}
+
+
+# Decrypt file, allow user to edit content and if not aborted, encrypt content back to file
+edit_encrypted_file()
+{
+  file="$1"
+
+  [ -e "$file" ] || error "File $file does not exist"
+
+  unencrypted_data="$(gpg --quiet --recipient "$PASSWORD_STORE_KEY" --decrypt "$file")"
+
+  if [ "$unencrypted_data" != "" ]; then
+    unencrypted_modified_data="$(printf '%s' "$unencrypted_data" | EDITOR=vim vipe 2> /dev/null)"
+
+    # If vipe was closed with :cq (non zero exit) then exit
+    [ $? -eq 0 ] || exit 0
+
+    if [ "$unencrypted_modified_data" != "" ]; then
+      printf '%s' "$unencrypted_modified_data" | gpg --recipient "$PASSWORD_STORE_KEY" --encrypt - > "$file"
+
+      # Delete variable data
+      unset unencrypted_modified_data
+    fi
+
+    # Delete variable data
+    unset unencrypted_data
+  fi
+
+
 }
 
 
