@@ -204,7 +204,7 @@ edit_encrypted_file()
     unencrypted_modified_data="$(printf '%s' "$unencrypted_data" | EDITOR=vim vipe 2> /dev/null)"
 
     # If vipe was closed with :cq (non zero exit) then exit
-    [ $? -eq 0 ] || exit 0
+    #[ $? -eq 0 ] || exit 0
 
     if [ "$unencrypted_modified_data" != "" ]; then
       printf '%s' "$unencrypted_modified_data" | gpg --recipient "$PASSWORD_STORE_KEY" --encrypt - > "$file"
