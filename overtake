@@ -1,0 +1,332 @@
+#!/bin/bash
+
+# Manage gpg encrypted files in pass .password-store type directory
+
+set -e
+
+
+# Print error message and exit
+error()
+{
+  echo "Error: $1"
+  exit 1
+}
+
+
+# Print help
+help ()
+{
+  echo help
+  exit 0
+}
+
+# Print usage message
+usage ()
+{
+  echo usage
+  exit 1
+}
+
+
+# Do we sync git?
+sync_git()
+{
+  [ "$SYNC_GIT" = "yes" ] && return 0
+  return 1
+}
+
+
+# Verify if password stoer dir is a git repo
+is_git_repo()
+{
+  if [ -d "$PASSWORD_STORE_DIR/.git" ]; then
+    return 0
+  fi
+
+  return 1
+}
+
+
+# Check if git has remotes
+git_has_remote()
+{
+  if is_git_repo; then
+    cd "$PASSWORD_STORE_DIR"
+    if [[ $(git branch -r) ]]; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+
+# If git repo and has remotes, do git pull
+git_pull()
+{
+  sync_git || return 0
+
+  # If git repo, make sure up to date
+  if git_has_remote; then
+    cd "$PASSWORD_STORE_DIR"
+    git pull || error "Unable to pull remote git repo"
+  fi
+}
+
+
+# If git repo git add file and commit it
+git_commit_all()
+{
+  sync_git || return 0
+
+  if is_git_repo; then
+    cd "$PASSWORD_STORE_DIR"
+    git add --all || error "Git add failed"
+    git commit -m 'Added' || error "Git commit failed"
+
+    # Note, this is the function name to do a push
+    git_push
+  fi
+}
+
+
+# If git repo and it has remote then do git push
+git_push()
+{
+    if git_has_remote; then
+      cd "$PASSWORD_STORE_DIR"
+      git push || error "Unable to push to remote git repo"
+    fi
+}
+
+
+# Return absolute file path for a file
+absolute_file_path()
+{
+  file_path="$1"
+  # Cut of .gpg extension if exists, and pop it back on, so we can handle with or without
+  file_path="${file_path%.gpg}.gpg"
+
+  # If file path does not start with a / it is relative and needs making absolute
+  if [[ "$file_path" != /* ]]; then
+    file_path="$PASSWORD_STORE_DIR/$file_path"
+  fi
+  echo "$file_path"
+}
+
+
+# Return file path relative to password store dir for a file
+relative_file_path()
+{
+  file_path="$1"
+  # Cut of .gpg extension if exists, and pop it back on, so we can handle with or without
+  file_path="${file_path%.gpg}.gpg"
+
+  # Strip password dir
+  file_path="${file_path#"$PASSWORD_STORE_DIR"/}"
+  echo "$file_path"
+}
+
+
+# Try to add new encrypted file with newly generated passphrase, update git if applicable
+add ()
+{
+  # If path contains PASSWORD_STORE_DIR, remove it, so we can handle both relative and absolute paths
+  file="$1"
+
+  file_path_absolute="$(absolute_file_path "$file")"
+  file_path_relative="$(relative_file_path "$file")"
+
+  [ -e "$file_path_absolute" ] && error "Unable to create $file_path_absolute, it already exists"
+
+  # Create directories if need be
+  file_directories="${file_path_absolute%/*}"
+  mkdir -p "$file_directories" || error "Unable to create $file_directories"
+
+  git_pull
+
+  # If ext function exists use it as template for new file
+  if [[ $(type -t OVERTAKE_EXT_template) == function ]]; then
+    cmd="OVERTAKE_EXT_template"
+  else
+    cmd="echo"
+  fi
+
+  # Create template and allow user to edit it
+  readarray -t unencrypted_content < <($cmd | vipe 2> /dev/null)
+
+  # Encrypt and write content, if not empty
+  if [ ${#unencrypted_content[@]} -gt 0 ]; then
+    printf '%s\n' "${unencrypted_content[@]}" \
+      | gpg --quiet --recipient "$PASSWORD_STORE_KEY" --encrypt > "$file_path_absolute"
+
+    git_commit_all
+  fi
+}
+
+
+# List all gpg files in password store
+list_pretty_paths()
+{
+  list_absolute_paths | sed 's#^'$PASSWORD_STORE_DIR'/## ; s/\.gpg$//'
+}
+
+
+list_absolute_paths()
+{
+  find "$PASSWORD_STORE_DIR" -type f -name '*.gpg'
+}
+
+
+# Decrypt, edit and reencrypt file, file passed as argument or selected from fzf
+edit()
+{
+  file="$(get_file_path "$1")"
+
+  git_pull
+
+  # THANK YOU xhienne! https://unix.stackexchange.com/a/388012
+  result="$(gpg --quiet --recipient "$PASSWORD_STORE_KEY" --decrypt "$file" || exit 1)" \
+    && result="$(vipe 2> /dev/null < <(printf '%s' "$result") || exit 1)" \
+    && gpg --recipient "$PASSWORD_STORE_KEY" --encrypt > "$file" < <(printf "%s" "$result")
+  unset result
+
+  git_commit_all
+}
+
+
+# Take path and make it absolute, if no path get user to choose
+get_file_path()
+{
+  file="$1"
+
+  if [ "$2" = "" ]; then
+    prompt="Password store $PASSWORD_STORE_DIR using key $PASSWORD_STORE_KEY"
+  else
+    prompt="$2"
+  fi
+
+  # If no argument, get user to select a file to edit
+  if [ "$file" = "" ]; then
+    file="$(list_pretty_paths | fzf "--header=$prompt" --exact || error "No file selected")"
+  fi
+
+  file_path_absolute="$(absolute_file_path "$file")"
+
+  [ -f "$file_path_absolute" ] || error "File $file_path_absolute does not exist"
+
+  echo "$file_path_absolute"
+}
+
+
+# Print decrypted key
+show()
+{
+  file="$(get_file_path "$1")"
+  gpg --quiet --recipient "$PASSWORD_STORE_KEY" --decrypt "$file" || error "Unable to decrypt key, perhaps key passphrase is not cached by gpg-agent yet?"
+}
+
+
+# Delete key
+delete()
+{
+  file="$(get_file_path "$1")"
+
+  [ -e "$file" ] || error "File $file does not exist"
+
+  git_pull
+
+  rm "$file"
+
+  git_commit_all
+}
+
+
+# Copy key to clipboard
+copy()
+{
+  file="$(get_file_path "$1")"
+
+  # If config file has defined a function for clipboard, use it to copy
+  if [[ $(type -t OVERTAKE_EXT_clipboard) == function ]]; then
+    show "$file" | OVERTAKE_EXT_clipboard
+  # Else emulate pass behaviour by just copying 1st line to clipboard
+  else
+    show "$file" | head -n1 | tr -d '\n' | xsel --clipboard
+  fi
+}
+
+
+# Exit if no args
+[ $# -lt 1 ] && usage
+
+# Use pass default password store path, or get from environment variable
+CONFIG_FILE="$HOME/.config/overtake.conf"
+PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR:-$HOME/.password-store}"
+PASSWORD_STORE_KEY="${PASSWORD_STORE_KEY:-your@gpg.key}"
+SYNC_GIT="${SYNC_GIT:-no}"
+
+# Load config
+[ -e "$CONFIG_FILE" ] && source "$CONFIG_FILE"
+
+# Remove any trailing slash
+PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}"
+
+[ -d "$PASSWORD_STORE_DIR" ] || error "No directory at $PASSWORD_STORE_DIR"
+
+mode="$1"
+
+case $mode in
+  add)
+    [ $# -ne 2 ] && usage
+    add "$2"
+  ;;
+  edit)
+    case $# in
+      1) edit ;;
+      2) edit "$2" ;;
+      *) usage ;;
+    esac
+  ;;
+  delete)
+     case $# in
+      1) delete ;;
+      2) delete "$2" ;;
+      *) usage ;;
+    esac
+  ;;
+  list)
+    case $# in
+      1) list_pretty_paths ;;
+      2)
+        if [ "$2" = "full" ]; then
+          list_absolute_paths
+        else
+          list_pretty_paths
+        fi
+      ;;
+      *) usage ;;
+    esac
+  ;;
+  show)
+    case $# in
+      1) show ;;
+      2) show "$2" ;;
+      *) usage ;;
+    esac
+  ;;
+  copy)
+    case $# in
+      1) copy ;;
+      2) copy "$2" ;;
+      *) usage ;;
+    esac
+  ;;
+  help)
+    help
+  ;;
+  *)
+    usage
+  ;;
+esac
+
