@@ -192,6 +192,7 @@ edit()
 
 
 # Decrypt file, allow user to edit content and if not aborted, encrypt content back to file
+# Nothing touches disk:)
 edit_encrypted_file()
 {
   file="$1"
@@ -201,10 +202,7 @@ edit_encrypted_file()
   unencrypted_data="$(gpg --quiet --recipient "$PASSWORD_STORE_KEY" --decrypt "$file")"
 
   if [ "$unencrypted_data" != "" ]; then
-    unencrypted_modified_data="$(printf '%s' "$unencrypted_data" | EDITOR=vim vipe 2> /dev/null)"
-
-    # If vipe was closed with :cq (non zero exit) then exit
-    #[ $? -eq 0 ] || exit 0
+    unencrypted_modified_data="$(printf '%s' "$unencrypted_data" | EDITOR=vim vipe 2> /dev/null || exit 0)"
 
     if [ "$unencrypted_modified_data" != "" ]; then
       printf '%s' "$unencrypted_modified_data" | gpg --recipient "$PASSWORD_STORE_KEY" --encrypt - > "$file"
