@@ -1,0 +1,44 @@
+" Setup vim to not write data to disk during editing session and on exit to encrypt buffer and write data to specific file on exit
+" Borrowed a lot from gnupg.vim. Thanks embear! https://github.com/embear/vim-gnupg/blob/master/plugin/gnupg.vim
+
+" Do not write to ~/.viminfo
+set viminfo=
+
+" Don't want a swap file, as it writes unencrypted data to disk
+set noswapfile
+
+" Turn off undo file, as it will contain unencrypted data to disk
+if has("+undofile")
+  set undofile=
+endif
+
+" Warn user about saving to disk, and prompt for confirmation
+autocmd BufWritePre * if ConfirmWrite() > 1 | throw "Write aborted" | endif
+
+cmap x call GPGEncryptBufferToDisk()
+cmap wq call GPGEncryptBufferToDisk()
+cmap ZZ call GPGEncryptBufferToDisk()
+cmap q q!
+"cmap w call GPGEncryptBufferToDisk()
+
+function s:GPGEncryptBufferToDisk()
+  " Switch buffer to binary mode
+  set bin
+
+  " Get contents of current buffer
+  let buffer = join(getline(1, '$'), "\n")
+
+  " gpg encrypt buffer to FILE
+  silent system("gpg --batch --yes --recipient " . shellescape($PASSWORD_STORE_KEY) . " --output " . shellescape($FILE) . " --encrypt", buffer)
+
+  " Quit, without saving buffer to disk
+  q!
+
+endfunction
+
+
+function ConfirmWrite()
+  " Cheers Ali https://vi.stackexchange.com/a/34531
+  return confirm("Really write contents originating from encrypted source to disk?", "&Yes\n&No", 1, "Warning")
+endfunction
+

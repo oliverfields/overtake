@@ -128,6 +128,11 @@ relative_file_path()
 }
 
 
+OVERTAKE_EXT_template()
+{
+  echo ""
+}
+
 # Try to add new encrypted file with newly generated passphrase, update git if applicable
 add ()
 {
@@ -145,15 +150,8 @@ add ()
 
   git_pull
 
-  # If ext function exists use it as template for new file
-  if [[ $(type -t OVERTAKE_EXT_template) == function ]]; then
-    cmd="OVERTAKE_EXT_template"
-  else
-    cmd="echo"
-  fi
-
   # Create template and allow user to edit it
-  readarray -t unencrypted_content < <($cmd | vipe 2> /dev/null)
+  readarray -t unencrypted_content < <(OVERTAKE_EXT_template | OVERTAKE_EXT_edit_stdin "$file_path_absolute")
 
   # Encrypt and write content, if not empty
   if [ ${#unencrypted_content[@]} -gt 0 ]; then
@@ -202,20 +200,19 @@ edit_encrypted_file()
   unencrypted_data="$(gpg --quiet --recipient "$PASSWORD_STORE_KEY" --decrypt "$file")"
 
   if [ "$unencrypted_data" != "" ]; then
-    unencrypted_modified_data="$(printf '%s' "$unencrypted_data" | EDITOR=vim vipe 2> /dev/null || exit 0)"
+    unencrypted_modified_data="$(printf '%s' "$unencrypted_data" | OVERTAKE_EXT_edit_stdin "$file" || exit 0)"
 
-    if [ "$unencrypted_modified_data" != "" ]; then
-      printf '%s' "$unencrypted_modified_data" | gpg --recipient "$PASSWORD_STORE_KEY" --encrypt - > "$file"
+    #if [ "$unencrypted_modified_data" != "" ]; then
+    #  printf '%s' "$unencrypted_modified_data" | gpg --recipient "$PASSWORD_STORE_KEY" --encrypt - > "$file"
 
       # Delete variable data
-      unset unencrypted_modified_data
-    fi
+    #  unset unencrypted_modified_data
+    #fi
 
-    # Delete variable data
-    unset unencrypted_data
   fi
 
-
+  # Delete variable data
+  unset unencrypted_data
 }
 
 
@@ -279,6 +276,20 @@ copy()
     show "$file" | head -n1 | tr -d '\n' | xsel --clipboard
   fi
 }
+
+# Accept input from stdin, the function must allow user to edit the input and save the edited content gpg encrypted to $1 argument
+# This function ensures stdin content is never saved to disk until it is encrypted
+OVERTAKE_EXT_edit_stdin()
+{
+  overtake_dir="$(cd "$(dirname "$0")" && pwd)"
+  overtake_dir="/home/oliver/.local/overtake"
+  FILE="$1" vim --not-a-term -u "$overtake_dir/overtake_vimrc" -
+  echo Writing gpg tp $FILE
+}
+
+
+#readarray -t unencrypted_content < <(OVERTAKE_EXT_template | OVERTAKE_EXT_edit_stdin "$file_path_absolute")
+echo yeah | OVERTAKE_EXT_edit_stdin "/tmp/x"
 
 
 # Exit if no args
