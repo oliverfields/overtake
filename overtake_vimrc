@@ -1,5 +1,29 @@
-" Setup vim to not write data to disk during editing session and on exit to encrypt buffer and write data to specific file on exit
+" Setup vim to not write data to disk during editing session and on exit to encrypt buffer with gpg using environment variable GPG_KEY and write data to file specified in environment variable GPG_ENCRYPTED_FILE file on exit
 " Borrowed a lot from gnupg.vim. Thanks embear! https://github.com/embear/vim-gnupg/blob/master/plugin/gnupg.vim
+
+
+function GPGEncryptBuffer()
+
+  " Switch buffer to binary mode
+  set bin
+
+  " Get contents of current buffer
+  let buffer = join(getline(1, '$'), "\n")
+
+  " gpg encrypt buffer to disk
+  echomsg system("gpg --recipient " . shellescape($GPG_KEY) . " --encrypt > " . shellescape($GPG_ENCRYPTED_FILE), buffer)
+
+  " Quit, without saving buffer to disk
+  q!
+
+endfunction
+
+
+function ConfirmWrite()
+  " Cheers Ali https://vi.stackexchange.com/a/34531
+  return confirm("Really write contents originating from encrypted source to disk?", "&Yes\n&No", 1, "Warning")
+endfunction
+
 
 " Do not write to ~/.viminfo
 set viminfo=
@@ -13,32 +37,12 @@ if has("+undofile")
 endif
 
 " Warn user about saving to disk, and prompt for confirmation
+" TODO make this throw a bit nicer, but for now it works, just fugly
 autocmd BufWritePre * if ConfirmWrite() > 1 | throw "Write aborted" | endif
 
-cmap x call GPGEncryptBufferToDisk()
-cmap wq call GPGEncryptBufferToDisk()
-cmap ZZ call GPGEncryptBufferToDisk()
+" Map so quiting with write encrypts buffer back to disk
+cmap x call GPGEncryptBuffer()
+cmap wq call GPGEncryptBuffer()
+cmap ZZ call GPGEncryptBuffer()
 cmap q q!
-"cmap w call GPGEncryptBufferToDisk()
-
-function s:GPGEncryptBufferToDisk()
-  " Switch buffer to binary mode
-  set bin
-
-  " Get contents of current buffer
-  let buffer = join(getline(1, '$'), "\n")
-
-  " gpg encrypt buffer to FILE
-  silent system("gpg --batch --yes --recipient " . shellescape($PASSWORD_STORE_KEY) . " --output " . shellescape($FILE) . " --encrypt", buffer)
-
-  " Quit, without saving buffer to disk
-  q!
-
-endfunction
-
-
-function ConfirmWrite()
-  " Cheers Ali https://vi.stackexchange.com/a/34531
-  return confirm("Really write contents originating from encrypted source to disk?", "&Yes\n&No", 1, "Warning")
-endfunction
 

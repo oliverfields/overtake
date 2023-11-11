@@ -2,6 +2,7 @@
 
 # Manage gpg encrypted files in pass .password-store type directory
 
+# Halt on error
 set -e
 
 
@@ -84,7 +85,7 @@ git_commit_all()
     git add --all || error "Git add failed"
     git commit -m 'Added' || error "Git commit failed"
 
-    # Note, this is the function name to do a push
+    # Note, this is the function name to do a push, the _ needs to be there
     git_push
   fi
 }
@@ -128,11 +129,6 @@ relative_file_path()
 }
 
 
-OVERTAKE_EXT_template()
-{
-  echo ""
-}
-
 # Try to add new encrypted file with newly generated passphrase, update git if applicable
 add ()
 {
@@ -145,21 +141,21 @@ add ()
   [ -e "$file_path_absolute" ] && error "Unable to create $file_path_absolute, it already exists"
 
   # Create directories if need be
+  # TODO trap ERR to delete dirs if things go south
   file_directories="${file_path_absolute%/*}"
   mkdir -p "$file_directories" || error "Unable to create $file_directories"
 
   git_pull
 
-  # Create template and allow user to edit it
-  readarray -t unencrypted_content < <(OVERTAKE_EXT_template | OVERTAKE_EXT_edit_stdin "$file_path_absolute")
-
-  # Encrypt and write content, if not empty
-  if [ ${#unencrypted_content[@]} -gt 0 ]; then
-    printf '%s\n' "${unencrypted_content[@]}" \
-      | gpg --quiet --recipient "$PASSWORD_STORE_KEY" --encrypt > "$file_path_absolute"
-
-    git_commit_all
+  if [[ $(type -t OVERTAKE_EXT_template) == function ]]; then
+    cmd="OVERTAKE_EXT_template"
+  else
+    cmd="echo ''"
   fi
+
+  $cmd | edit_encrypted_file "$file_path_absolute"
+
+  git_commit_all
 }
 
 
@@ -189,30 +185,26 @@ edit()
 }
 
 
-# Decrypt file, allow user to edit content and if not aborted, encrypt content back to file
-# Nothing touches disk:)
+# Decrypt file, allow user to edit content and if not aborted, encrypt content back to file, no unencrypted data touches disk
+# If this is not compatible in your environment and/or you want to use some other editor than vim, you can define a function in config called OVERTAKE_EXT_edit_encrypted_file to do this
 edit_encrypted_file()
 {
   file="$1"
 
-  [ -e "$file" ] || error "File $file does not exist"
-
-  unencrypted_data="$(gpg --quiet --recipient "$PASSWORD_STORE_KEY" --decrypt "$file")"
-
-  if [ "$unencrypted_data" != "" ]; then
-    unencrypted_modified_data="$(printf '%s' "$unencrypted_data" | OVERTAKE_EXT_edit_stdin "$file" || exit 0)"
-
-    #if [ "$unencrypted_modified_data" != "" ]; then
-    #  printf '%s' "$unencrypted_modified_data" | gpg --recipient "$PASSWORD_STORE_KEY" --encrypt - > "$file"
-
-      # Delete variable data
-    #  unset unencrypted_modified_data
-    #fi
-
+  # If file argument is not empty and encrypted gpg file exists, decrypt and pipe to vim
+  if test "$file" != ""  && test -e "$file"; then
+    cmd="gpg_decrypt_file $file"
+  # Else assume we have unencrypted input from stdin
+  else
+    cmd="cat"
   fi
 
-  # Delete variable data
-  unset unencrypted_data
+  if [[ $(type -t OVERTAKE_EXT_edit_encrypted_file) == function ]]; then
+    $cmd | OVERTAKE_EXT_edit_encrypted_file "$file"
+  else
+    # Vim must be run main shell (not subshell)
+    $cmd | GPG_KEY="$PASSWORD_STORE_KEY" GPG_ENCRYPTED_FILE="$file" vim --not-a-term -u "$OVERTAKE_DIR/overtake_vimrc" -
+  fi
 }
 
 
@@ -244,7 +236,7 @@ get_file_path()
 show()
 {
   file="$(get_file_path "$1")"
-  gpg --quiet --recipient "$PASSWORD_STORE_KEY" --decrypt "$file" || error "Unable to decrypt key, perhaps key passphrase is not cached by gpg-agent yet?"
+  gpg_decrypt_file "$file"
 }
 
 
@@ -277,19 +269,13 @@ copy()
   fi
 }
 
-# Accept input from stdin, the function must allow user to edit the input and save the edited content gpg encrypted to $1 argument
-# This function ensures stdin content is never saved to disk until it is encrypted
-OVERTAKE_EXT_edit_stdin()
+
+gpg_decrypt_file ()
 {
-  overtake_dir="$(cd "$(dirname "$0")" && pwd)"
-  overtake_dir="/home/oliver/.local/overtake"
-  FILE="$1" vim --not-a-term -u "$overtake_dir/overtake_vimrc" -
-  echo Writing gpg tp $FILE
+  file="$1"
+  [ -e "$file" ] || error "File $file not found, unable to decrypt"
+  gpg --quiet --decrypt "$file" || error "Unable to decrypt $file, perhaps key passphrase is not cached by gpg-agent yet?"
 }
-
-
-#readarray -t unencrypted_content < <(OVERTAKE_EXT_template | OVERTAKE_EXT_edit_stdin "$file_path_absolute")
-echo yeah | OVERTAKE_EXT_edit_stdin "/tmp/x"
 
 
 # Exit if no args
@@ -300,6 +286,8 @@ CONFIG_FILE="$HOME/.config/overtake.conf"
 PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR:-$HOME/.password-store}"
 PASSWORD_STORE_KEY="${PASSWORD_STORE_KEY:-your@gpg.key}"
 SYNC_GIT="${SYNC_GIT:-no}"
+OVERTAKE_DIR="$(realpath "$BASH_SOURCE")"
+OVERTAKE_DIR="${OVERTAKE_DIR%/*}"
 
 # Load config
 [ -e "$CONFIG_FILE" ] && source "$CONFIG_FILE"
