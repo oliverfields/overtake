@@ -44,5 +44,4 @@ autocmd BufWritePre * if ConfirmWrite() > 1 | throw "Write aborted" | endif
 cmap x call GPGEncryptBuffer()
 cmap wq call GPGEncryptBuffer()
 cmap ZZ call GPGEncryptBuffer()
-cmap q q!
 

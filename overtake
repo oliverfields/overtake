@@ -9,8 +9,14 @@ set -e
 # Print error message and exit
 error()
 {
-  echo "Error: $1"
-  exit 1
+  msg="$1"
+  exit_code="$2"
+
+  echo "Error: $1" >&2
+
+  [ "$exit_code" = "" ] && exit_code=1
+
+  exit $exit_code
 }
 
 
@@ -18,13 +24,12 @@ error()
 help ()
 {
   echo help
-  exit 0
 }
 
 # Print usage message
 usage ()
 {
-  echo usage
+  echo -e "Usage: overtake [add <file>|copy [file]|delete [file]|edit [file]|help|list [--full]|show [file]]"
   exit 1
 }
 
@@ -32,12 +37,18 @@ usage ()
 # Do we sync git?
 sync_git()
 {
-  [ "$SYNC_GIT" = "yes" ] && return 0
+  if [ "$SYNC_GIT" = "yes" ]; then
+    if command -v git &> /dev/null; then
+      return 0
+    else
+      error "SYNC_GIT=yes, but git command not found"
+    fi
+  fi
   return 1
 }
 
 
-# Verify if password stoer dir is a git repo
+# Verify if password store dir is a git repo
 is_git_repo()
 {
   if [ -d "$PASSWORD_STORE_DIR/.git" ]; then
@@ -85,7 +96,6 @@ git_commit_all()
     git add --all || error "Git add failed"
     git commit -m 'Added' || error "Git commit failed"
 
-    # Note, this is the function name to do a push, the _ needs to be there
     git_push
   fi
 }
@@ -105,6 +115,7 @@ git_push()
 absolute_file_path()
 {
   file_path="$1"
+
   # Cut of .gpg extension if exists, and pop it back on, so we can handle with or without
   file_path="${file_path%.gpg}.gpg"
 
@@ -112,7 +123,12 @@ absolute_file_path()
   if [[ "$file_path" != /* ]]; then
     file_path="$PASSWORD_STORE_DIR/$file_path"
   fi
-  echo "$file_path"
+
+  if [ -f "$file_path" ]; then
+    echo "$file_path"
+  fi
+
+  return 1
 }
 
 
@@ -125,7 +141,12 @@ relative_file_path()
 
   # Strip password dir
   file_path="${file_path#"$PASSWORD_STORE_DIR"/}"
-  echo "$file_path"
+
+  if [ -f "$file_path" ]; then
+    echo "$file_path"
+  fi
+
+  return 1
 }
 
 
@@ -153,6 +174,8 @@ add ()
     cmd="echo ''"
   fi
 
+
+#TODO maybe not always pipe?
   $cmd | edit_encrypted_file "$file_path_absolute"
 
   git_commit_all
@@ -177,6 +200,8 @@ edit()
 {
   file="$(get_file_path "$1")"
 
+  [ "$file" = "" ] && exit 0
+
   git_pull
 
   edit_encrypted_file "$file"
@@ -199,10 +224,11 @@ edit_encrypted_file()
     cmd="cat"
   fi
 
+# TODO maybe not always pipe
   if [[ $(type -t OVERTAKE_EXT_edit_encrypted_file) == function ]]; then
     $cmd | OVERTAKE_EXT_edit_encrypted_file "$file"
   else
-    # Vim must be run main shell (not subshell)
+    # Vim must be run main shell (not subshell) else it hangs
     $cmd | GPG_KEY="$PASSWORD_STORE_KEY" GPG_ENCRYPTED_FILE="$file" vim --not-a-term -u "$OVERTAKE_DIR/overtake_vimrc" -
   fi
 }
@@ -221,12 +247,13 @@ get_file_path()
 
   # If no argument, get user to select a file to edit
   if [ "$file" = "" ]; then
-    file="$(list_pretty_paths | fzf "--header=$prompt" --exact || error "No file selected")"
+    file="$(list_pretty_paths | fzf "--header=$prompt" --exact)"
+    [ "$file" = "" ] && return 0
   fi
 
   file_path_absolute="$(absolute_file_path "$file")"
 
-  [ -f "$file_path_absolute" ] || error "File $file_path_absolute does not exist"
+  [ -f "$file_path_absolute" ] || error "Path $file is not valid"
 
   echo "$file_path_absolute"
 }
@@ -236,7 +263,9 @@ get_file_path()
 show()
 {
   file="$(get_file_path "$1")"
-  gpg_decrypt_file "$file"
+
+  # No file selected
+  [ "$file" = "" ] || gpg_decrypt_file "$file"
 }
 
 
@@ -244,6 +273,9 @@ show()
 delete()
 {
   file="$(get_file_path "$1")"
+
+  # No file selected
+  [ "$file" = "" ] && exit 0
 
   [ -e "$file" ] || error "File $file does not exist"
 
@@ -286,11 +318,21 @@ CONFIG_FILE="$HOME/.config/overtake.conf"
 PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR:-$HOME/.password-store}"
 PASSWORD_STORE_KEY="${PASSWORD_STORE_KEY:-your@gpg.key}"
 SYNC_GIT="${SYNC_GIT:-no}"
-OVERTAKE_DIR="$(realpath "$BASH_SOURCE")"
-OVERTAKE_DIR="${OVERTAKE_DIR%/*}"
+
 
 # Load config
 [ -e "$CONFIG_FILE" ] && source "$CONFIG_FILE"
+
+# Set OVERTAKE_DIR, where the source is found
+if [ "$OVERTAKE_DIR" != "" ]; then
+  if command -v realpath &> /dev/null; then
+    OVERTAKE_DIR="$(realpath "$BASH_SOURCE")"
+  else
+    OVERTAKE_DIR="$BASH_SOURCE"
+    OVERTAKE_DIR="${OVERTAKE_DIR%/*}"
+    echo "Command realpath from Coreutils not found. Assuming overtake is installed at $OVERTAKE_DIR, but if symlinks are used this may not be correct and you may need to set OVERTAKE_DIR in overtake.conf."
+  fi
+fi
 
 # Remove any trailing slash
 PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}"
@@ -301,7 +343,10 @@ mode="$1"
 
 case $mode in
   add)
-    [ $# -ne 2 ] && usage
+    if [ $# -ne 2 ]; then
+      echo "Error: Expected file argument"
+      usage
+    fi
     add "$2"
   ;;
   edit)
@@ -322,7 +367,7 @@ case $mode in
     case $# in
       1) list_pretty_paths ;;
       2)
-        if [ "$2" = "full" ]; then
+        if [ "$2" = "--full" ]; then
           list_absolute_paths
         else
           list_pretty_paths
