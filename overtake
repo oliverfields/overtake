@@ -142,16 +142,12 @@ relative_file_path()
   # Strip password dir
   file_path="${file_path#"$PASSWORD_STORE_DIR"/}"
 
-  if [ -f "$file_path" ]; then
-    echo "$file_path"
-  fi
-
-  return 1
+  echo "$file_path"
 }
 
 
 # Try to add new encrypted file with newly generated passphrase, update git if applicable
-add ()
+add()
 {
   # If path contains PASSWORD_STORE_DIR, remove it, so we can handle both relative and absolute paths
   file="$1"
@@ -174,8 +170,8 @@ add ()
     cmd="echo ''"
   fi
 
-
 #TODO maybe not always pipe?
+# TODO when adding it does not work to pass file_path to edit because file does not exist yet
   $cmd | edit_encrypted_file "$file_path_absolute"
 
   git_commit_all
@@ -338,6 +334,7 @@ fi
 PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}"
 
 [ -d "$PASSWORD_STORE_DIR" ] || error "No directory at $PASSWORD_STORE_DIR"
+
 
 mode="$1"
 
