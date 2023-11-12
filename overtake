@@ -324,7 +324,7 @@ SYNC_GIT="${SYNC_GIT:-no}"
 [ -e "$CONFIG_FILE" ] && source "$CONFIG_FILE"
 
 # Set OVERTAKE_DIR, where the source is found
-if [ "$OVERTAKE_DIR" != "" ]; then
+if [ "$OVERTAKE_DIR" = "" ]; then
   if command -v realpath &> /dev/null; then
     OVERTAKE_DIR="$(realpath "$BASH_SOURCE")"
   else
