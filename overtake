@@ -54,7 +54,7 @@ The argument [file] is optional, if not specified a file selection dialogue will
 		This text
 ' | fmt
 
-usage
+  usage
 }
 
 # Print usage message
@@ -290,7 +290,9 @@ show()
   file="$(get_file_path "$1")"
 
   # No file selected
-  [ "$file" = "" ] || gpg_decrypt_file "$file"
+  [ "$file" = "" ] && exit 0
+
+  gpg_decrypt_file "$file"
 }
 
 
@@ -316,6 +318,9 @@ delete()
 copy()
 {
   file="$(get_file_path "$1")"
+
+  # No file selected
+  [ "$file" = "" ] && exit 0
 
   # If config file has defined a function for clipboard, use it to copy
   if [[ $(type -t OVERTAKE_EXT_clipboard) == function ]]; then
