@@ -87,12 +87,16 @@ _overtake_complete()
       add)
         # Only complete directories
         #_filedir -d
-        _pass_complete_folders
+
+        # Only do completion if a relative path (not starting with /)
+        [ "${cur:0:1}" != '/' ] && _pass_complete_folders
         ;;
       copy|delete|edit|show)
-          # Complete *.gpg file paths
-          #_filedir gpg
-          _pass_complete_entries
+        # Complete *.gpg file paths
+        #_filedir gpg
+
+        # Only do completion if a relative path (not starting with /)
+        [ "${cur:0:1}" != '/' ] && _pass_complete_entries
         ;;
       list)
         COMPREPLY=( $(compgen -W "--full --tree" -- $cur) )
