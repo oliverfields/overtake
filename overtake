@@ -159,7 +159,7 @@ list_absolute_paths()
 list_tree()
 {
   if command -v tree &> /dev/null; then
-    tree -P '*.gpg' "$PASSWORD_STORE_DIR"
+    tree -P '*.gpg' "$PASSWORD_STORE_DIR" | sed 's/\.gpg$//'
   else
     echo "Command tree not found, it is often in moreutils"
   fi
