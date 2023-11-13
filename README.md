@@ -13,9 +13,7 @@ Overtake is a CLI client for managing gpg encrypted files in a directory hiearch
 
 ## Installation
 
-1. Either `git clone https://github.com/oliverfields/overtake.git` or [download .zip](https://github.com/oliverfields/overtake/archive/refs/heads/main.zip)
-  
-  This guide assumes overtake is located at `~/.local/overtake`
+1. Either `git clone` or download from github. This guide assumes overtake is located at `~/.local/overtake`
 2. Create password store directory `mkdir ~/.password-store`, if you already have this and use it with `pass`, it will work just fine
 3. Create config file `cp ~/.local/overtake/overtake.conf .config/overtake.conf`
 4. Edit `overtake.conf` so **PASSWORD_STORE_KEY** matches your GPG Key ID. See [Creating a GPG key](#CreatingAGPGKey) if you do not already have one
