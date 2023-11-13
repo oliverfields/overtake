@@ -21,13 +21,44 @@ error()
 
 
 # Print help
-help ()
+help()
 {
-  echo help
+  echo -e '
+Manage directory of GPG encrypted files.
+
+The argument [file] is optional, if not specified a file selection dialogue will be opened.
+
+	\e[1madd\e[0m <file>
+		Create new file in $PASSWORD_STORE_DIR, path must be relative (not start with /). If path contains directories, these will also be created
+
+		\e[1mExample\e[0m
+			$ overtake add gnupg.org/login
+			Creates $PASSWORD_STORE_DIR/gnupg directory if not already created, and login.gpg encrypted file
+
+	\e[1mcopy\e[0m [file]
+		Copies decrypted contents to clipboard
+
+	\e[1mdelete\e[0m [file]
+		Deletes file from $PASSWORD_STORE_DIR
+
+	\e[1medit\e[0m [file]
+		Decrypt file, open in vi for editing and encrypt contents back to <file>
+
+	\e[1mlist\e[0m [--full|--tree]
+		List .gpg files in $PASSWORD_STORE_DIR, --full lists full path, --tree shows tree view
+
+	\e[1mshow\e[0m [file]
+		Print decrypted file to terminal
+
+	\e[1mhelp\e[0m
+		This text
+' | fmt
+
+usage
 }
 
 # Print usage message
-usage ()
+usage()
 {
   echo -e "Usage: overtake [add <file>|copy [file]|delete [file]|edit [file]|help|list [--full]|show [file]]"
   exit 1
@@ -296,7 +327,7 @@ copy()
 }
 
 
-gpg_decrypt_file ()
+gpg_decrypt_file()
 {
   file="$1"
   [ -e "$file" ] || error "File $file not found, unable to decrypt"
