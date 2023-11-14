@@ -120,7 +120,6 @@ batch_repos_cmd()
   done
 }
 
- 
 
 # Return absolute file path for a file
 absolute_file_path()
@@ -241,7 +240,7 @@ edit_then_encrypt()
 }
 
 
-# Given a path look up until find a .gpg-id file, this contains the recipients
+# Given a path look up until find a .gpg-id file, this contains the recipients, one per line
 get_gpg_recipients()
 {
   dir_path="${1%/*}"
@@ -258,25 +257,19 @@ get_gpg_recipients()
     cd ..
   done
 
-  if [ "$gpg_id_file" = "" ]; then
-    # No id file found, try to set from environment variable
-    if [ "$PASSWORD_STORE_DEFAULT_RECIPIENTS" != "" ]; then
-      recipients="$PASSWORD_STORE_DEFAULT_RECIPIENTS"
-    else
-      error "No gpg recipients defined in .gpg-id files or set in PASSWORD_STORE_DIR_DEFAULT_RECIPIENTS"
-    fi
-  else
+  if [ "$gpg_id_file" != "" ]; then
     recipients=$(paste -s -d ',' "$gpg_id_file")
   fi
 
-  echo "$recipients"
+  # Add recipients from settings also
+  recipients="$PASSWORD_STORE_DEFAULT_RECIPIENTS $recipients"
+  recipients="$PASSWORD_STORE_KEY $recipients"
 
-  # Make gpg recipients arguments
-#  IFS=',' read -r -a gpg_recipients <<< "$recipients"
-#
-#  for r in "${gpg_recipients[@]}"; do
-#    echo -n " --recipient '$r'"
-#  done
+  [ "$recipients" = "" ] && error "No gpg recipients defined in .gpg-id files or set in PASSWORD_STORE_DIR_DEFAULT_RECIPIENTS"
+
+echo TODO check recipients
+
+  echo "$recipients"
 }
 
 
