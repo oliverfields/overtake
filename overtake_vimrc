@@ -10,11 +10,13 @@ function GPGEncryptBuffer()
   " Get contents of current buffer
   let buffer = join(getline(1, '$'), "\n")
 
+  " Make args of recipients
+  let recipients = " --recipient \"" . substitute($GPG_RECIPIENTS, ",", "\" --recipient \"", "g") . "\""
   " gpg encrypt buffer to disk
-  echomsg system("gpg --recipient " . shellescape($GPG_KEY) . " --encrypt > " . shellescape($GPG_ENCRYPTED_FILE), buffer)
+  echomsg system("gpg " . recipients . " --encrypt > " . shellescape($GPG_ENCRYPTED_FILE), buffer)
 
   " Quit, without saving buffer to disk
-  q!
+  "q!
 
 endfunction
 
@@ -44,4 +46,5 @@ autocmd BufWritePre * if ConfirmWrite() > 1 | throw "Write aborted" | endif
 cmap x call GPGEncryptBuffer()
 cmap wq call GPGEncryptBuffer()
 cmap ZZ call GPGEncryptBuffer()
+cmap q q!
 

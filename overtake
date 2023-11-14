@@ -65,82 +65,62 @@ usage()
 }
 
 
-# Do we sync git?
-sync_git()
+# For all git repositories in password store, run batch commands
+batch_repos_cmd()
 {
-  if [ "$SYNC_GIT" = "yes" ]; then
-    if command -v git &> /dev/null; then
-      return 0
-    else
-      error "SYNC_GIT=yes, but git command not found"
-    fi
-  fi
-  return 1
-}
-
-
-# Verify if password store dir is a git repo
-is_git_repo()
-{
-  if [ -d "$PASSWORD_STORE_DIR/.git" ]; then
+  if [ "$SYNC_GIT" != "yes" ]; then
     return 0
   fi
 
-  return 1
-}
+  if ! command -v git &> /dev/null; then
+      error "git command not found"
+  fi
+
+  batch_cmd="$1"
+
+  # Check args
+  if [ "$batch_cmd" != "pull" ] && [ "$batch_cmd" != "commitall" ]; then
+    error "No valid batch command supplied for batch_command_repos $batch_cmd"
+  fi
 
 
-# Check if git has remotes
-git_has_remote()
-{
-  if is_git_repo; then
-    cd "$PASSWORD_STORE_DIR"
+  # Find all git repos in password store
+  readarray repos < <(find "$PASSWORD_STORE_DIR" -type d -name '.git')
+
+  for repo in "${repos[@]}"; do
+
+    git_dir="${repo%/*}"
+
+    cd "$git_dir" || error "Unable to cd to $git_dir"
+
     if [[ $(git branch -r) ]]; then
-      return 0
+      has_remote="yes"
+    else
+      has_remote="no"
     fi
-  fi
 
-  return 1
+    case $batch_cmd in
+      pull)
+        if [ "$has_remote" = "yes" ]; then
+          git pull --quiet || error "Unable to pull repo $repo remote"
+        fi
+      ;;
+      commitall)
+        # Check if changes, if so commit and push
+        if [ -n "$(git status --porcelain)" ]; then
+          git add --all || error "Git add failed on repo $repo"
+          git commit -m 'Added' --quiet || error "Git commit failed on repo $repo"
+
+          if [ "$has_remote" = "yes" ]; then
+            git push --quiet || error "Unable to push to remote git repo $repo"
+          fi
+        fi
+      ;;
+    esac
+  done
 }
 
-
-# If git repo and has remotes, do git pull
-git_pull()
-{
-  sync_git || return 0
-
-  # If git repo, make sure up to date
-  if git_has_remote; then
-    cd "$PASSWORD_STORE_DIR"
-    git pull || error "Unable to pull remote git repo"
-  fi
-}
-
-
-# If git repo git add file and commit it
-git_commit_all()
-{
-  sync_git || return 0
-
-  if is_git_repo; then
-    cd "$PASSWORD_STORE_DIR"
-    git add --all || error "Git add failed"
-    git commit -m 'Added' || error "Git commit failed"
-
-    git_push
-  fi
-}
-
-
-# If git repo and it has remote then do git push
-git_push()
-{
-    if git_has_remote; then
-      cd "$PASSWORD_STORE_DIR"
-      git push || error "Unable to push to remote git repo"
-    fi
-}
-
+ 
 
 # Return absolute file path for a file
 absolute_file_path()
@@ -212,15 +192,15 @@ add()
   file_directories="${file_path_absolute%/*}"
   mkdir -p "$file_directories" || error "Unable to create $file_directories"
 
-  git_pull
+  batch_repos_cmd pull
 
   if [[ $(type -t OVERTAKE_EXT_template) == function ]]; then
-    OVERTAKE_EXT_template | edit_then_encrypt "$file_path_absolute" "-"
+    OVERTAKE_EXT_template | edit_then_encrypt "$file_path_absolute" "$(get_gpg_recipients "$file_path_absolute")" "-"
   else
-    edit_then_encrypt "$file_path_absolute"
+    edit_then_encrypt "$file_path_absolute" "$(get_gpg_recipients "$file_path_absolute")"
   fi
 
-  git_commit_all
+  batch_repos_cmd commitall
 }
 
 
@@ -231,31 +211,72 @@ edit()
 
   [ "$file" = "" ] && exit 0
 
-  git_pull
+  batch_repos_cmd pull
 
-  gpg_decrypt_file "$file" | edit_then_encrypt "$file" -
+  gpg_decrypt_file "$file" | edit_then_encrypt "$file" "$(get_gpg_recipients "$file")" "-"
 
-  git_commit_all
+  batch_repos_cmd commitall
 }
 
 
 # Allow user to edit data and save it encrypted to disk
 # Must be callable in two ways
-# 1. With just one argument specifying the path to save data to
-#    E.g edit_then_encrypt "/tmp/myfile.gpg"
-# 2. With two arguments, the path to save data to and "-" indicating stdin, and data piped into the funtion
-#    E.g echo "My content" | edit_then_encrypt "/tmp/myfile.gpg" "-"
+# 1. With path to save data to and the recipients (CSV if multiple) to encrypt to
+#    E.g edit_then_encrypt "/tmp/myfile.gpg" "your@email.com,another@email.com"
+# 2. With the path to save to, recipients andand "-" indicating stdin, and data piped into the funtion
+#    E.g echo "My content" | edit_then_encrypt "/tmp/myfile.gpg" "me@you.com" "-"
 edit_then_encrypt()
 {
   save_path="$1"
-  stdin_arg="$2"
+  recipients="$2"
+  stdin_arg="$3"
+
   if [ "$stdin_arg" = "-" ]; then
     cmd="cat"
   else
     cmd="echo ''"
   fi
 
-  $cmd | GPG_KEY="$PASSWORD_STORE_KEY" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_DIR/overtake_vimrc" -
+  $cmd | GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_DIR/overtake_vimrc" -
+}
+
+
+# Given a path look up until find a .gpg-id file, this contains the recipients
+get_gpg_recipients()
+{
+  dir_path="${1%/*}"
+  gpg_id_file=""
+
+  cd "$dir_path"
+
+  # Go up directory tree until find a valid .gpg-id file, quit if we gone passed the password store
+  while [ "$PWD" != "${PASSWORD_STORE_DIR%/*}" ]; do
+    if [ -f "$PWD/.gpg-id" ]; then
+      gpg_id_file="$PWD/.gpg-id"
+      break
+    fi
+    cd ..
+  done
+
+  if [ "$gpg_id_file" = "" ]; then
+    # No id file found, try to set from environment variable
+    if [ "$PASSWORD_STORE_DEFAULT_RECIPIENTS" != "" ]; then
+      recipients="$PASSWORD_STORE_DEFAULT_RECIPIENTS"
+    else
+      error "No gpg recipients defined in .gpg-id files or set in PASSWORD_STORE_DIR_DEFAULT_RECIPIENTS"
+    fi
+  else
+    recipients=$(paste -s -d ',' "$gpg_id_file")
+  fi
+
+  echo "$recipients"
+
+  # Make gpg recipients arguments
+#  IFS=',' read -r -a gpg_recipients <<< "$recipients"
+#
+#  for r in "${gpg_recipients[@]}"; do
+#    echo -n " --recipient '$r'"
+#  done
 }
 
 
@@ -265,7 +286,7 @@ get_file_path()
   file="$1"
 
   if [ "$2" = "" ]; then
-    prompt="Password store $PASSWORD_STORE_DIR using key $PASSWORD_STORE_KEY"
+    prompt="Password store $PASSWORD_STORE_DIR using key $PASSWORD_STORE_DEFAULT_RECIPIENTS"
   else
     prompt="$2"
   fi
@@ -293,6 +314,10 @@ show()
   [ "$file" = "" ] && exit 0
 
   gpg_decrypt_file "$file"
+  echo -e "\n"
+
+  read -p "Press any key to clear terminal and continue.." key
+  clear
 }
 
 
@@ -306,11 +331,11 @@ delete()
 
   [ -e "$file" ] || error "File $file does not exist"
 
-  git_pull
+  batch_repos_cmd pull
 
   rm "$file"
 
-  git_commit_all
+  batch_repos_cmd commitall
 }
 
 
@@ -346,7 +371,7 @@ gpg_decrypt_file()
 # Use pass default password store path, or get from environment variable
 CONFIG_FILE="$HOME/.config/overtake.conf"
 PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR:-$HOME/.password-store}"
-PASSWORD_STORE_KEY="${PASSWORD_STORE_KEY:-your@gpg.key}"
+PASSWORD_STORE_DEFAULT_RECIPIENTS="${PASSWORD_STORE_KEY:-your@gpg.key}"
 SYNC_GIT="${SYNC_GIT:-no}"
 
 
@@ -368,6 +393,7 @@ fi
 PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}"
 
 [ -d "$PASSWORD_STORE_DIR" ] || error "No directory at $PASSWORD_STORE_DIR"
+
 
 mode="$1"
 
