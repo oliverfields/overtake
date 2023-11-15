@@ -12,7 +12,7 @@ error()
   msg="$1"
   exit_code="$2"
 
-  echo "Error: $1" >&2
+  echo -e "Error: $1" >&2
 
   [ "$exit_code" = "" ] && exit_code=1
 
@@ -109,7 +109,7 @@ batch_repos_cmd()
         # Check if changes, if so commit and push
         if [ -n "$(git status --porcelain)" ]; then
           git add --all || error "Git add failed on repo $repo"
-          git commit -m 'Added' --quiet || error "Git commit failed on repo $repo"
+          git commit -m 'Overtake sync' --quiet || error "Git commit failed on repo $repo"
 
           if [ "$has_remote" = "yes" ]; then
             git push --quiet || error "Unable to push to remote git repo $repo"
@@ -169,7 +169,7 @@ list_absolute_paths()
 list_tree()
 {
   if command -v tree &> /dev/null; then
-    tree -P '*.gpg' "$PASSWORD_STORE_DIR" | sed 's/\.gpg$//'
+    tree -a -I .git -I .gitignore -I .gitattributes "$PASSWORD_STORE_DIR" | sed 's/\.gpg$//'
   else
     echo "Command tree not found, it is often in moreutils"
   fi
@@ -243,7 +243,8 @@ edit_then_encrypt()
 # Given a path look up until find a .gpg-id file, this contains the recipients, one per line
 get_gpg_recipients()
 {
-  dir_path="${1%/*}"
+  file="$1"
+  dir_path="${file%/*}"
   gpg_id_file=""
 
   cd "$dir_path"
@@ -258,18 +259,50 @@ get_gpg_recipients()
   done
 
   if [ "$gpg_id_file" != "" ]; then
-    recipients=$(paste -s -d ',' "$gpg_id_file")
+    recipients_string=$(paste -s -d ' ' "$gpg_id_file")
   fi
 
   # Add recipients from settings also
-  recipients="$PASSWORD_STORE_DEFAULT_RECIPIENTS $recipients"
-  recipients="$PASSWORD_STORE_KEY $recipients"
+  recipients_string="$PASSWORD_STORE_DEFAULT_RECIPIENTS $recipients_string"
+  recipients_string="$PASSWORD_STORE_KEY $recipients_string"
 
-  [ "$recipients" = "" ] && error "No gpg recipients defined in .gpg-id files or set in PASSWORD_STORE_DIR_DEFAULT_RECIPIENTS"
+  # Need to tidy up, remove any duplicates and verify that have recipient keys
+  recipients_tmp_array=( $recipients_string )
 
-echo TODO check recipients
+  [ ${#recipients_tmp_array[@]} -eq 0 ] && error "No gpg recipients defined in PASSWORD_STORE_DIR_DEFAULT_RECIPIENTS, .gpg-id files or PASSWORD_STORE_KEY"
 
-  echo "$recipients"
+  # Use associative array to weed out duplicates
+  declare -A recipients
+  for r in "${recipients_tmp_array[@]}"; do
+    recipients["$r"]="NULL"
+  done
+
+  missing_keys=()
+
+  # Check we have gpg public keys for the recipients
+  for key in "${!recipients[@]}"; do
+    if gpg --list-keys "$key" &> /dev/null; then
+      recipients[$key]="yes"
+    else
+      recipients[$key]="no"
+      missing_keys+=($key)
+    fi
+  done
+
+
+  if [ ${#missing_keys[@]} -ne 0 ]; then
+    missing_keys_string="${missing_keys[@]}"
+    missing_keys_string="${missing_keys_string// /, }"
+    error "Unable to encrypt $file, no public keys found for: $missing_keys_string"
+  fi
+
+  recipient_keys=""
+  for key in "${!recipients[@]}"; do
+    recipient_keys="$recipient_keys $key"
+  done
+  recipient_keys="${recipient_keys# }"
+
+  echo -n "$recipient_keys"
 }
 
 
@@ -307,8 +340,7 @@ show()
   [ "$file" = "" ] && exit 0
 
   gpg_decrypt_file "$file"
-  echo -e "\n"
-
+  echo ""
   read -p "Press any key to clear terminal and continue.." key
   clear
 }
@@ -386,7 +418,6 @@ fi
 PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}"
 
 [ -d "$PASSWORD_STORE_DIR" ] || error "No directory at $PASSWORD_STORE_DIR"
-
 
 mode="$1"
 

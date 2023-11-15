@@ -1,7 +1,6 @@
 " Setup vim to not write data to disk during editing session and on exit to encrypt buffer with gpg using environment variable GPG_KEY and write data to file specified in environment variable GPG_ENCRYPTED_FILE file on exit
 " Borrowed a lot from gnupg.vim. Thanks embear! https://github.com/embear/vim-gnupg/blob/master/plugin/gnupg.vim
 
-
 function GPGEncryptBuffer()
 
   " Switch buffer to binary mode
@@ -11,12 +10,12 @@ function GPGEncryptBuffer()
   let buffer = join(getline(1, '$'), "\n")
 
   " Make args of recipients
-  let recipients = " --recipient \"" . substitute($GPG_RECIPIENTS, ",", "\" --recipient \"", "g") . "\""
+  let recipients = " --recipient \"" . substitute($GPG_RECIPIENTS, " ", "\" --recipient \"", "g") . "\""
   " gpg encrypt buffer to disk
   echomsg system("gpg " . recipients . " --encrypt > " . shellescape($GPG_ENCRYPTED_FILE), buffer)
 
   " Quit, without saving buffer to disk
-  "q!
+  q!
 
 endfunction
 
