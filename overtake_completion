@@ -10,7 +10,7 @@ _pass_complete_entries () {
   local autoexpand=${1:-0}
 
   local IFS=$'\n'
-  local items=($(compgen -f $prefix$cur))
+  local items=($(compgen -f $prefix))
 
   # Remember the value of the first item, to see if it is a directory. If
   # it is a directory, then don't add a space to the completion
@@ -43,7 +43,7 @@ _pass_complete_entries () {
     [[ -d $item ]] && item="$item/"
 
     item="${item%$suffix}"
-    COMPREPLY+=("${item#$prefix}")
+    COMPREPLY+=("${item#$prefix$prev}")
     if [[ $i -eq 0 ]]; then
       firstitem=$item
     fi
@@ -63,13 +63,31 @@ _pass_complete_folders () {
   local IFS=$'\n'
   local items=($(compgen -d $prefix$cur))
 
-  compopt -o nospace
+  #compopt -o nospace
 
   for item in ${items[@]}; do
     [[ $item == $prefix.* ]] && continue
     COMPREPLY+=("${item#$prefix}/")
   done
 }
+
+
+# https://stackoverflow.com/questions/12933362/getting-compgen-to-include-slashes-on-directories-when-looking-for-files/40227233#40227233
+_foo_compgen_filenames() {
+    local cur="$1"
+
+    local PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR:-$HOME/.password-store/}"
+    PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}/"
+
+    # Files, excluding directories:
+    grep -v -F -f <(compgen -d -P ^ -S '$' -- $PASSWORD_STORE_DIR"$cur") \
+        <(compgen -f -P ^ -S '$' -- $PASSWORD_STORE_DIR"$cur") |
+        sed -e 's|^\^'$PASSWORD_STORE_DIR'||' -e 's/\$$/ /'
+
+    # Directories:
+    compgen -d -S / -- $PASSWORD_STORE_DIR"$cur" | sed -e 's|'$PASSWORD_STORE_DIR'||'
+}
+
 
 command -v overtake &> /dev/null &&
 _overtake_complete()
@@ -96,7 +114,12 @@ _overtake_complete()
         #_filedir gpg
 
         # Only do completion if a relative path (not starting with /)
-        [ "${cur:0:1}" != '/' ] && _pass_complete_entries
+        if [ "${cur:0:1}" = '/' ]; then
+          _filedir
+        else
+          #_pass_complete_entries
+          COMPREPLY=( $(_foo_compgen_filenames "$cur") )
+        fi
         ;;
       list)
         COMPREPLY=( $(compgen -W "--full --tree" -- $cur) )
@@ -105,5 +128,5 @@ _overtake_complete()
   fi
 
 } &&
-complete -F _overtake_complete overtake
+complete -o nospace -F _overtake_complete overtake
 
