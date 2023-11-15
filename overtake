@@ -109,7 +109,7 @@ batch_repos_cmd()
         # Check if changes, if so commit and push
         if [ -n "$(git status --porcelain)" ]; then
           git add --all || error "Git add failed on repo $repo"
-          git commit -m 'Added' --quiet || error "Git commit failed on repo $repo"
+          git commit -m 'Overtake sync' --quiet || error "Git commit failed on repo $repo"
 
           if [ "$has_remote" = "yes" ]; then
             git push --quiet || error "Unable to push to remote git repo $repo"
@@ -169,7 +169,7 @@ list_absolute_paths()
 list_tree()
 {
   if command -v tree &> /dev/null; then
-    tree -P '*.gpg' "$PASSWORD_STORE_DIR" | sed 's/\.gpg$//'
+    tree -a -I .git -I .gitignore "$PASSWORD_STORE_DIR" | sed 's/\.gpg$//'
   else
     echo "Command tree not found, it is often in moreutils"
   fi
@@ -266,10 +266,10 @@ get_gpg_recipients()
   recipients_string="$PASSWORD_STORE_DEFAULT_RECIPIENTS $recipients_string"
   recipients_string="$PASSWORD_STORE_KEY $recipients_string"
 
-  [ "$recipients_string" = "" ] && error "No gpg recipients defined in .gpg-id files or set in PASSWORD_STORE_DIR_DEFAULT_RECIPIENTS"
-
   # Need to tidy up, remove any duplicates and verify that have recipient keys
   recipients_tmp_array=( $recipients_string )
+
+  [ ${#recipients_tmp_array[@]} -eq 0 ] && error "No gpg recipients defined in PASSWORD_STORE_DIR_DEFAULT_RECIPIENTS, .gpg-id files or PASSWORD_STORE_KEY"
 
   # Use associative array to weed out duplicates
   declare -A recipients

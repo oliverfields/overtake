@@ -1,4 +1,4 @@
-# overtake - a pass client
+# overtake - a pass like client
 
 Overtake is a CLI client for managing gpg encrypted files in a directory hiearchy. It is inspired by [pass](https://www.passwordstore.org/) and works out of the box with your existing **pass** `.password-store` directory.
 
@@ -16,7 +16,7 @@ Overtake is a CLI client for managing gpg encrypted files in a directory hiearch
 1. Either `git clone` or download from github. This guide assumes overtake is located at `~/.local/overtake`
 2. Create password store directory `mkdir ~/.password-store`, if you already have this and use it with `pass`, it will work just fine
 3. Create config file `cp ~/.local/overtake/overtake.conf .config/overtake.conf`
-4. Edit `overtake.conf` so **PASSWORD_STORE_KEY** matches your GPG Key ID. See [Creating a GPG key](#creating-a-gpg-key) if you do not already have one
+4. Edit `overtake.conf` so **PASSWORD_STORE_DEFAULT_RECIPIENTS** matches your GPG Key ID, you can add multiple recipients by separating them with a space. See [Creating a GPG key](#creating-a-gpg-key) if you do not already have one
 5. If you want bash completion typically symlink to wherever your distro looks for bash completion scripts e.g. `ln -s ~/.local/overtake/overtake_completion /etc/bash_completion.d/overtake_completion`. Or, maybe source it in a startup script `echo '. ~/.local/overtake/overtake_completion' >> ~/.profile`
 
 Some commands to try.
@@ -28,7 +28,7 @@ Some commands to try.
 
 # GPG
 
-GPG is a large field, that is worth reading up on as it is central to using overtake, but please look elsewhere for enlightenment.
+GPG is a large field, that is worth reading up on as it is central to using overtake, but please look elsewhere for more worthwhile gpg enlightenment.
 
 ## Creating a GPG key
 
@@ -40,10 +40,10 @@ Under the hood overtake uses gpg to encrypt and decrypt files. When encrypting i
 
 GPG recipients can be spesified in the following ways.
 
-* Space separated list either set by environment variable or in `overtake.conf` setting **PASSWORD_STORE_DEFAULT_RECIPIENTS**, these recipients will be applied to all keys in password store. To be compatible with **pass**, environment variable or config setting **PASSWORD_STORE_KEY** can also be used in the same way
-* Specified one recipients per line in `.gpg-id`. These files can be set anywhere in the password store, and the recipients are applied in addition to **PASSWORD_STORE_DEFAULT_RECIPIENTS** and **PASSWORD_STORE_KEY**, for all keys in the current directory and below. If a new `.gpg-key` file is found, it will be used instead. See example below.
+* Space separated list either set by environment variable or in `overtake.conf` setting named **PASSWORD_STORE_DEFAULT_RECIPIENTS**, these recipients will be applied to all keys in password store. To be compatible with **pass**, environment variable or config setting **PASSWORD_STORE_KEY** can also be used in the same way
+* Specified one recipients per line in `.gpg-id`. These files can be set anywhere in the password store, and the recipients are applied in addition to **PASSWORD_STORE_DEFAULT_RECIPIENTS** and **PASSWORD_STORE_KEY**, for all keys in the current directory and below. If a new `.gpg-key` file is found, its recipients will be used instead
 
-Given the following setup:
+Consider this example using the following setup:
 
 The setting `PASSWORD_STORE_DEFAULT_RECIPIENTS=me@my.tld` is set in `overtake.conf` and the password store directory is set up as follows.
 
@@ -88,7 +88,16 @@ Assume we have one git repo for the password store, but also want to include pas
   git clone <shared password store repo> shared
 ```
 
-Now edit `~/.password-store/.gitignore` and add a line containing `/shared/`.
+The directory structure will look like so.
+
+```
+~/password-store
+├── .git
+└── shared
+    └── .git
+```
+
+Now edit `~/.password-store/.gitignore` and add a line containing `/shared/`, so the `<main password store repo>` ignores the `<shared password store repo>`.
 
 When overtake modifies the password store it will also keep both git repos synced automatically.
 
