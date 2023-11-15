@@ -15,7 +15,7 @@ function GPGEncryptBuffer()
   echomsg system("gpg " . recipients . " --encrypt > " . shellescape($GPG_ENCRYPTED_FILE), buffer)
 
   " Quit, without saving buffer to disk
-  "q!
+  q!
 
 endfunction
 
