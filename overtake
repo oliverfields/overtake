@@ -169,7 +169,7 @@ list_absolute_paths()
 list_tree()
 {
   if command -v tree &> /dev/null; then
-    tree -a -I .git -I .gitignore "$PASSWORD_STORE_DIR" | sed 's/\.gpg$//'
+    tree -a -I .git -I .gitignore -I .gitattributes "$PASSWORD_STORE_DIR" | sed 's/\.gpg$//'
   else
     echo "Command tree not found, it is often in moreutils"
   fi
@@ -340,8 +340,7 @@ show()
   [ "$file" = "" ] && exit 0
 
   gpg_decrypt_file "$file"
-  echo -e "\n"
-
+  echo ""
   read -p "Press any key to clear terminal and continue.." key
   clear
 }
