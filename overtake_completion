@@ -1,91 +1,38 @@
 #!/bin/bash
 
-# _pass_complete_entries and _pass_complete_folders are copied from https://git.zx2c4.com/password-store/tree/src/completion/pass.bash-completion
 
 
-_pass_complete_entries () {
-  local prefix="${PASSWORD_STORE_DIR:-$HOME/.password-store/}"
-  prefix="${prefix%/}/"
-  local suffix=".gpg"
-  local autoexpand=${1:-0}
+_overtake_complete_entries () {
+  # Need to know where password store is, check for environment variable, else load from config
+  [ "$PASSWORD_STORE_DIR" ] || eval "$(grep '^PASSWORD_STORE_DIR=' "$HOME/.config/overtake.conf" | sed 's/^/export /')"
 
-  local IFS=$'\n'
-  local items=($(compgen -f $prefix))
+  # Always end prefix with a /
+  local prefix="${PASSWORD_STORE_DIR%/}/"
+  local cur="$1"
 
-  # Remember the value of the first item, to see if it is a directory. If
-  # it is a directory, then don't add a space to the completion
-  local firstitem=""
-  # Use counter, can't use ${#items[@]} as we skip hidden directories
-  local i=0 item
+  # cur can either be a directory (e.g. 'bla/' or 'bla') or a partial path 'bl'
+#dir1/dir1-1/d <- Not a directory, so list items in password store/dir1/dir1-1/
+#dir <- Not a directory, so list items in password store/
+#dir1/ <- Is a directory, so list items in it
 
-  for item in ${items[@]}; do
-    [[ $item =~ /\.[^/]*$ ]] && continue
-
-    # if there is a unique match, and it is a directory with one entry
-    # autocomplete the subentry as well (recursively)
-    if [[ ${#items[@]} -eq 1 && $autoexpand -eq 1 ]]; then
-      while [[ -d $item ]]; do
-        local subitems=($(compgen -f "$item/"))
-        local filtereditems=( ) item2
-        for item2 in "${subitems[@]}"; do
-          [[ $item2 =~ /\.[^/]*$ ]] && continue
-          filtereditems+=( "$item2" )
-        done
-        if [[ ${#filtereditems[@]} -eq 1 ]]; then
-          item="${filtereditems[0]}"
-        else
-          break
-        fi
-      done
-    fi
-
-    # append / to directories
-    [[ -d $item ]] && item="$item/"
-
-    item="${item%$suffix}"
-    COMPREPLY+=("${item#$prefix$prev}")
-    if [[ $i -eq 0 ]]; then
-      firstitem=$item
-    fi
-    let i+=1
-  done
-
-  # The only time we want to add a space to the end is if there is only
-  # one match, and it is not a directory
-  if [[ $i -gt 1 || ( $i -eq 1 && -d $firstitem ) ]]; then
-    compopt -o nospace
+  if [ "$cur" = "" ]; then
+    search_path="$prefix"
+  # If prefix/current is a directory, then return files and directories from it
+  elif [ -d "$prefix/$cur" ]; then
+    search_path="$prefix${cur%/}/"
+  # If cur contains a /, remove everything after slash (should be a directory) and return files and directories from prefix/cur with string from last / stripped
+  elif [[ "$cur" =~ .*"/".* ]]; then
+    search_path="$prefix${cur%/*}"
+  # list contents of prefix with everything after last / stripped
+  # cur contains no slash
+  else
+    search_path="$prefix"
   fi
-}
 
-_pass_complete_folders () {
-  local prefix="${PASSWORD_STORE_DIR:-$HOME/.password-store/}"
-  prefix="${prefix%/}/"
-  local IFS=$'\n'
-  local items=($(compgen -d $prefix$cur))
-
-  #compopt -o nospace
-
-  for item in ${items[@]}; do
-    [[ $item == $prefix.* ]] && continue
-    COMPREPLY+=("${item#$prefix}/")
+  echo $search_path
+  for item in ls "$search_path"; do
+    echo $item
   done
-}
-
-
-# https://stackoverflow.com/questions/12933362/getting-compgen-to-include-slashes-on-directories-when-looking-for-files/40227233#40227233
-_foo_compgen_filenames() {
-    local cur="$1"
-
-    local PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR:-$HOME/.password-store/}"
-    PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}/"
-
-    # Files, excluding directories:
-    grep -v -F -f <(compgen -d -P ^ -S '$' -- $PASSWORD_STORE_DIR"$cur") \
-        <(compgen -f -P ^ -S '$' -- $PASSWORD_STORE_DIR"$cur") |
-        sed -e 's|^\^'$PASSWORD_STORE_DIR'||' -e 's/\$$/ /'
-
-    # Directories:
-    compgen -d -S / -- $PASSWORD_STORE_DIR"$cur" | sed -e 's|'$PASSWORD_STORE_DIR'||'
 }
 
 
@@ -117,8 +64,7 @@ _overtake_complete()
         if [ "${cur:0:1}" = '/' ]; then
           _filedir
         else
-          #_pass_complete_entries
-          COMPREPLY=( $(_foo_compgen_filenames "$cur") )
+          COMPREPLY=( $(_overtake_complete_entries "$cur") )
         fi
         ;;
       list)
@@ -128,5 +74,5 @@ _overtake_complete()
   fi
 
 } &&
-complete -o nospace -F _overtake_complete overtake
+complete -F _overtake_complete overtake
 
