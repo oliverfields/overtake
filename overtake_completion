@@ -1,102 +1,21 @@
 #!/bin/bash
 
-shopt -s nullglob
-shopt -s dotglob
-
-
+# https://stackoverflow.com/questions/1146098/properly-handling-spaces-and-quotes-in-bash-completion
 _overtake_complete_entries ()
 {
-  # Need to know where password store is, check for environment variable, else load from config
-  [ "$PASSWORD_STORE_DIR" ] || eval "$(grep '^PASSWORD_STORE_DIR=' "$HOME/.config/overtake.conf" | sed 's/^/export /')"
+  local IFS=$'\n'
+  local prefix="${PASSWORD_STORE_DIR:-$HOME/.password-store/}"
+  prefix="${prefix%/}/"
+  local suffix=".gpg"
+  local cur="${COMP_WORDS[2]}"
+  local items=($(compgen -f $prefix$cur))
 
-  # Always end prefix with a /
-  local search_path="${PASSWORD_STORE_DIR%/}"
-  local cur="$1"
-  local search_name="*"
-
-  COMPREPLY=()
-
-  if [ "$cur" != "" ]; then
-    if [ -f "$PASSWORD_STORE_DIR/$cur" ]; then
-      return
-    elif [ -d "$PASSWORD_STORE_DIR/$cur" ]; then
-      COMPREPLY=("${cur%/}/")
-    fi
-  fi
-
-  sp_tmp="$search_path/$cur"
-
-  search_name="${sp_tmp##*/}*"
-  search_path="${sp_tmp%/*}"
-
-  # Return COMPREPLY with valid completions
-  while read -r item; do
-    [ "$item" = "$search_path" ] && continue
-
-    name="${item#$search_path/}"
-
-    # Skip hidden items, unless it is a .gpg-id file
-    if [ "${name:0:1}" = "." ]; then
-      if [ "$name" != '.gpg-id' ]; then
-        continue
-      fi
-    fi
-
-    if [ -d "$item" ]; then
-      COMPREPLY+=("$name/")
-    else
-      COMPREPLY+=("$name ")
-    fi
-
-  done < <( find "$search_path" -maxdepth 1 -type d -name "$search_name" ; find "$search_path" -maxdepth 1 -type f -name "$search_name" )
-}
-
-
-_1overtake_complete_entries () {
-  # Need to know where password store is, check for environment variable, else load from config
-  [ "$PASSWORD_STORE_DIR" ] || eval "$(grep '^PASSWORD_STORE_DIR=' "$HOME/.config/overtake.conf" | sed 's/^/export /')"
-
-  # Always end prefix with a /
-  local prefix="${PASSWORD_STORE_DIR%/}/"
-  local cur="$1"
-  local current_dir_option=""
-  local search_path=""
-
-  # cur can either be a directory (e.g. 'bla/' or 'bla') or a partial path 'bl'
-#dir1/dir1-1/d <- Not a directory, so list items in password store/dir1/dir1-1/
-#dir <- Not a directory, so list items in password store/
-#dir1/ <- Is a directory, so list items in it
-
-  if [ "$cur" = "" ]; then
-#echo cur empty
-    search_path="$prefix"
-  # If prefix/current is a directory, then return files and directories from it
-  elif [ -d "$prefix/$cur" ]; then
-#echo cur is directory
-    search_path="$prefix${cur%/}/"
-    current_dir_option="${cur%/}/"
-  # If cur contains a /, remove everything after slash (should be a directory) and return files and directories from prefix/cur with string from last / stripped
-  elif [[ "$cur" =~ .*"/".* ]]; then
-#echo cur is partial directory or file
-    search_path="$prefix${cur%/*}/"
-  # list contents of prefix with everything after last / stripped
-  # cur contains no slash
-  else
-#echo cur is not dir
-    search_path="$prefix"
-  fi
-
-#echo $search_path
-#echo -----
-
-  COMPREPLY=()
-
-  [ "$current_dir_option" != "" ] && COMPREPLY+=("$current_dir_option")
-
-  local items=($search_path*)
   for item in "${items[@]}"; do
+    name="${item#$prefix}"
+    name="${name%$suffix}"
 
-    local name="${item##*/}"
+    # Escape any spaces
+    name="${name// /\ }"
 
     # Skip hidden items, unless it is a .gpg-id file
     if [ "${name:0:1}" = "." ]; then
@@ -106,17 +25,11 @@ _1overtake_complete_entries () {
     fi
 
     if [ -d "$item" ]; then
-      COMPREPLY+=("$name/")
+      COMPREPLY+=($(printf '%q\n' "$name/"))
     else
-      # Only show files *.gpg and .gpg-id files
-      if [ "$name" = ".gpg-id" ] || [ "${name##*.}" = "gpg" ]; then 
-        COMPREPLY+=("$name")
-      else
-        continue
-      fi
+      COMPREPLY+=($(printf '%q\n' "$name "))
     fi
   done
-
 }
 
 
@@ -144,11 +57,17 @@ _overtake_complete()
         # Complete *.gpg file paths
         #_filedir gpg
 
-        # Only do completion if a relative path (not starting with /)
+        # If a relative path (not starting with /) use _filedir for completion, else home brewed
+
+        compopt -o nospace
+
         if [ "${cur:0:1}" = '/' ]; then
           _filedir
         else
-          _overtake_complete_entries "$cur"
+          #pushd "$HOME/.password-store" >/dev/null
+          #_filedir
+          #popd >/dev/null
+          _overtake_complete_entries
         fi
         ;;
       list)
@@ -158,5 +77,5 @@ _overtake_complete()
   fi
 
 } &&
-complete -o nospace -F _overtake_complete overtake
+complete -F _overtake_complete overtake
 
