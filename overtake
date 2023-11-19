@@ -193,10 +193,12 @@ add()
 
   batch_repos_cmd pull
 
+  gpg_recipients="$(get_gpg_recipients "$file_path_absolute")"
+
   if [[ $(type -t OVERTAKE_EXT_template) == function ]]; then
-    OVERTAKE_EXT_template | edit_then_encrypt "$file_path_absolute" "$(get_gpg_recipients "$file_path_absolute")" "-"
+    OVERTAKE_EXT_template | edit_then_encrypt "$file_path_absolute" "$gpg_recipients" "-"
   else
-    edit_then_encrypt "$file_path_absolute" "$(get_gpg_recipients "$file_path_absolute")"
+    edit_then_encrypt "$file_path_absolute" "$gpg_recipients"
   fi
 
   batch_repos_cmd commitall
@@ -212,7 +214,8 @@ edit()
 
   batch_repos_cmd pull
 
-  gpg_decrypt_file "$file" | edit_then_encrypt "$file" "$(get_gpg_recipients "$file")" "-"
+  gpg_recipients="$(get_gpg_recipients "$file_path_absolute")"
+  gpg_decrypt_file "$file" | edit_then_encrypt "$file" "$gpg_recipients" "-"
 
   batch_repos_cmd commitall
 }
