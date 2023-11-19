@@ -332,7 +332,7 @@ get_file_path()
 
 
 # Print decrypted content
-show()
+print_decrypted_content()
 {
   file="$(get_file_path "$1")"
 
@@ -340,6 +340,12 @@ show()
   [ "$file" = "" ] && exit 0
 
   gpg_decrypt_file "$file"
+}
+
+
+show()
+{
+  print_decrypted_content "$1"
   echo ""
   read -p "Press any key to clear terminal and continue.." key
   clear
@@ -374,10 +380,10 @@ copy()
 
   # If config file has defined a function for clipboard, use it to copy
   if [[ $(type -t OVERTAKE_EXT_clipboard) == function ]]; then
-    show "$file" | OVERTAKE_EXT_clipboard
+    print_decrypted_content "$file" | OVERTAKE_EXT_clipboard
   # Else emulate pass behaviour by just copying 1st line to clipboard
   else
-    show "$file" | head -n1 | tr -d '\n' | xsel --clipboard
+    print_decrypted_content "$file" | head -n1 | tr -d '\n' | xsel --clipboard
   fi
 }
 

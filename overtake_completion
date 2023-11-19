@@ -3,6 +3,8 @@
 # https://stackoverflow.com/questions/1146098/properly-handling-spaces-and-quotes-in-bash-completion
 _overtake_complete_entries ()
 {
+  compopt -o filenames
+
   local IFS=$'\n'
   local prefix="${PASSWORD_STORE_DIR:-$HOME/.password-store/}"
   prefix="${prefix%/}/"
@@ -13,18 +15,20 @@ _overtake_complete_entries ()
   for item in "${items[@]}"; do
 
     local name="${item#$prefix}"
-    #name="${item##*/}"
     name="${name%.gpg}"
 
     # Skip hidden files
     [ "${name:0:1}" = "." ] && continue
 
     if [ -d "$item" ]; then
-      COMPREPLY+=($(printf '%q\n' "$name/"))
+      COMPREPLY+=("$name/")
     else
-      COMPREPLY+=($(printf '%q \n' "$name"))
+      COMPREPLY+=("$name")
     fi
   done
+
+  # Only add space to end if COMPREPLY option and it is a file, else disable this functionality(option)
+  [[ ${#COMPREPLY[@]} -eq 1 && -f "$prefix${COMPREPLY[0]}.gpg" ]] || compopt -o nospace
 }
 
 
@@ -50,7 +54,6 @@ _overtake_complete()
         ;;
       copy|delete|edit|show)
         # Complete *.gpg file paths
-        compopt -o nospace
         _overtake_complete_entries
         ;;
       list)
