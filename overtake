@@ -214,7 +214,8 @@ edit()
 
   batch_repos_cmd pull
 
-  gpg_recipients="$(get_gpg_recipients "$file_path_absolute")"
+  gpg_recipients="$(get_gpg_recipients "$file")"
+
   gpg_decrypt_file "$file" | edit_then_encrypt "$file" "$gpg_recipients" "-"
 
   batch_repos_cmd commitall
