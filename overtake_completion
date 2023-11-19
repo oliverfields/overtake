@@ -6,28 +6,23 @@ _overtake_complete_entries ()
   local IFS=$'\n'
   local prefix="${PASSWORD_STORE_DIR:-$HOME/.password-store/}"
   prefix="${prefix%/}/"
-  local suffix=".gpg"
-  local cur="${COMP_WORDS[2]}"
+  #local cur="${COMP_WORDS[2]}"
+  local cur=${COMP_WORDS[COMP_CWORD]}
   local items=($(compgen -f $prefix$cur))
 
   for item in "${items[@]}"; do
-    name="${item#$prefix}"
-    name="${name%$suffix}"
 
-    # Escape any spaces
-    name="${name// /\ }"
+    local name="${item#$prefix}"
+    #name="${item##*/}"
+    name="${name%.gpg}"
 
-    # Skip hidden items, unless it is a .gpg-id file
-    if [ "${name:0:1}" = "." ]; then
-      if [ "$name" != '.gpg-id' ]; then
-        continue
-      fi
-    fi
+    # Skip hidden files
+    [ "${name:0:1}" = "." ] && continue
 
     if [ -d "$item" ]; then
       COMPREPLY+=($(printf '%q\n' "$name/"))
     else
-      COMPREPLY+=($(printf '%q\n' "$name "))
+      COMPREPLY+=($(printf '%q \n' "$name"))
     fi
   done
 }
@@ -55,20 +50,8 @@ _overtake_complete()
         ;;
       copy|delete|edit|show)
         # Complete *.gpg file paths
-        #_filedir gpg
-
-        # If a relative path (not starting with /) use _filedir for completion, else home brewed
-
         compopt -o nospace
-
-        if [ "${cur:0:1}" = '/' ]; then
-          _filedir
-        else
-          #pushd "$HOME/.password-store" >/dev/null
-          #_filedir
-          #popd >/dev/null
-          _overtake_complete_entries
-        fi
+        _overtake_complete_entries
         ;;
       list)
         COMPREPLY=( $(compgen -W "--full --tree" -- $cur) )
