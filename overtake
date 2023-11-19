@@ -85,9 +85,7 @@ batch_repos_cmd()
 
 
   # Find all git repos in password store
-  readarray repos < <(find "$PASSWORD_STORE_DIR" -type d -name '.git')
-
-  for repo in "${repos[@]}"; do
+  for repo in $(find "$PASSWORD_STORE_DIR" -type d -name '.git'); do
 
     git_dir="${repo%/*}"
 
