@@ -293,7 +293,7 @@ get_gpg_recipients()
   if [ ${#missing_keys[@]} -ne 0 ]; then
     missing_keys_string="${missing_keys[@]}"
     missing_keys_string="${missing_keys_string// /, }"
-    error "Unable to encrypt $file, no public keys found for: $missing_keys_string"
+    error "No public keys match $missing_keys_string, unable to process $file"
   fi
 
   recipient_keys=""
