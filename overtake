@@ -392,7 +392,7 @@ gpg_decrypt_file()
 # Use pass default password store path, or get from environment variable
 CONFIG_FILE="$HOME/.config/overtake.conf"
 PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR:-$HOME/.password-store}"
-PASSWORD_STORE_DEFAULT_RECIPIENTS="${PASSWORD_STORE_KEY:-your@gpg.key}"
+PASSWORD_STORE_DEFAULT_RECIPIENTS="${PASSWORD_STORE_KEY}"
 SYNC_GIT="${SYNC_GIT:-no}"
 
 
