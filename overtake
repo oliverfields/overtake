@@ -189,8 +189,6 @@ add()
   file_directories="${file_path_absolute%/*}"
   mkdir -p "$file_directories" || error "Unable to create $file_directories"
 
-  batch_repos_cmd pull
-
   gpg_recipients="$(get_gpg_recipients "$file_path_absolute")"
 
   if [[ $(type -t OVERTAKE_EXT_template) == function ]]; then
@@ -198,8 +196,6 @@ add()
   else
     edit_then_encrypt "$file_path_absolute" "$gpg_recipients"
   fi
-
-  batch_repos_cmd commitall
 }
 
 
@@ -210,13 +206,9 @@ edit()
 
   [ "$file" = "" ] && exit 0
 
-  batch_repos_cmd pull
-
   gpg_recipients="$(get_gpg_recipients "$file")"
 
   gpg_decrypt_file "$file" | edit_then_encrypt "$file" "$gpg_recipients" "-"
-
-  batch_repos_cmd commitall
 }
 
 
@@ -364,11 +356,7 @@ delete()
 
   [ -e "$file" ] || error "File $file does not exist"
 
-  batch_repos_cmd pull
-
   rm "$file"
-
-  batch_repos_cmd commitall
 }
 
 
@@ -429,6 +417,18 @@ PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}"
 
 mode="$1"
 
+
+# Git pull
+case $mode in
+  help)
+    : # Do nothing
+  ;;
+  *)
+    batch_repos_cmd pull
+  ;;
+esac
+
+
 case $mode in
   add)
     if [ $# -ne 2 ]; then
@@ -488,3 +488,13 @@ case $mode in
   ;;
 esac
 
+
+# Git commit
+case $mode in
+  help|list)
+    : # Do nothing
+  ;;
+  *)
+    batch_repos_cmd commitall
+  ;;
+esac
