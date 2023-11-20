@@ -45,14 +45,7 @@ _overtake_complete()
     COMPREPLY=( $(compgen -W "add copy delete edit help list show" -- $cur) )
   elif [ $COMP_CWORD -eq 2 ]; then
     case "$prev" in
-      add)
-        # Only complete directories
-        #_filedir -d
-
-        # Only do completion if a relative path (not starting with /)
-        [ "${cur:0:1}" != '/' ] && _pass_complete_folders
-        ;;
-      copy|delete|edit|show)
+      add|copy|delete|edit|show)
         # Complete *.gpg file paths
         _overtake_complete_entries
         ;;
