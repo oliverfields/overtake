@@ -35,6 +35,15 @@ The argument [file] is optional, if not specified a file selection dialogue will
 			$ overtake add gnupg.org/login
 			Creates $PASSWORD_STORE_DIR/gnupg directory if not already created, and login.gpg encrypted file
 
+	\e[1mgit\e[0m [--commit-all|--pull-all]
+		Manually trigger git commands
+
+		--commit-all
+			Commit all changes to git repositories in password store
+
+		--pull-all
+			Manually trigger pulls on all git repositories in password store
+
 	\e[1mcopy\e[0m [file]
 		Copies decrypted contents to clipboard
 
@@ -44,8 +53,20 @@ The argument [file] is optional, if not specified a file selection dialogue will
 	\e[1medit\e[0m [file]
 		Decrypt file, open in vi for editing and encrypt contents back to <file>
 
-	\e[1mlist\e[0m [--full|--tree]
-		List .gpg files in $PASSWORD_STORE_DIR, --full lists full path, --tree shows tree view
+	\e[1mlist\e[0m [--absolute|--git-repositories|--pretty|--recipients]
+		List .gpg files in $PASSWORD_STORE_DIR, defaults to tree view
+
+		--absoulte
+			Lists full paths
+
+		--git-repositories
+			List git repositories in password store
+
+		--pretty
+			Show tree view
+
+		--recipients
+			Show recipients per .gpg file
 
 	\e[1mshow\e[0m [file]
 		Print decrypted file to terminal
@@ -60,7 +81,7 @@ The argument [file] is optional, if not specified a file selection dialogue will
 # Print usage message
 usage()
 {
-  echo -e "Usage: overtake [add <file>|copy [file]|delete [file]|edit [file]|help|list [--full]|show [file]]"
+  echo -e "Usage: overtake [add <file>copy [file]|delete [file]|edit [file]|git [--commit-all|--pull-all]|help|list [--full]|show [file]]"
   exit 1
 }
 
@@ -69,7 +90,7 @@ usage()
 batch_repos_cmd()
 {
   if [ "$SYNC_GIT" != "yes" ]; then
-    return 0
+    return
   fi
 
   if ! command -v git &> /dev/null; then
@@ -169,9 +190,42 @@ list_tree()
   if command -v tree &> /dev/null; then
     tree "$PASSWORD_STORE_DIR" | sed 's/\.gpg$//'
   else
-    echo "Command tree not found, it is often in moreutils"
+    echo "Warning: Command tree not found so doing a plain list instead" > /dev/stderr
+    list_pretty_paths
   fi
 }
+
+
+list_git_repos()
+{
+  for repo in $(find "$PASSWORD_STORE_DIR" -type d -name '.git'); do
+    cd "${repo%/.git}"
+    echo "$PWD/.git $(git ls-remote --get-url origin)"
+  done | sort
+}
+
+
+list_recipients()
+{
+  for encfile in $(find "$PASSWORD_STORE_DIR" -type f -name '*.gpg' | sort); do
+
+    echo -n "${encfile#$PASSWORD_STORE_DIR/}"
+
+    gpg --decrypt --list-only --keyid-format long "$encfile" 2>&1 \
+    | while read -r line; do
+      if [[ "$line" == gpg:* ]]; then
+        :
+        #key_id="${line##* ID }"
+        #key_id="${key_id%,*}"
+
+        #echo -n " $key_id"
+      elif [[ "$line" == 	* ]]; then
+        echo -n " $line"
+      fi
+    done | sed 's/"[^"]*<//g ; s/>"//g ; s/$/\n/'
+  done
+}
+
 
 # Try to add new encrypted file with newly generated passphrase, update git if applicable
 add()
@@ -395,7 +449,6 @@ PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR:-$HOME/.password-store}"
 PASSWORD_STORE_DEFAULT_RECIPIENTS="${PASSWORD_STORE_KEY}"
 SYNC_GIT="${SYNC_GIT:-no}"
 
-
 # Load config
 [ -e "$CONFIG_FILE" ] && source "$CONFIG_FILE"
 
@@ -453,15 +506,15 @@ case $mode in
   ;;
   list)
     case $# in
-      1) list_pretty_paths ;;
+      1) list_tree ;;
       2)
-        if [ "$2" = "--full" ]; then
-          list_absolute_paths
-        elif [ "$2" = "--tree" ]; then
-          list_tree
-        else
-          list_pretty_paths
-        fi
+        case $2 in
+          --absolute) list_absolute_paths ;;
+          --pretty) list_pretty_paths ;;
+          --git-repositories) list_git_repos ;;
+          --recipients) list_recipients ;;
+          *) usage ;;
+        esac
       ;;
       *) usage ;;
     esac
@@ -479,6 +532,14 @@ case $mode in
       2) copy "$2" ;;
       *) usage ;;
     esac
+  ;;
+  git)
+    if [ "$2" = "--pull-all" ] || [ "$2" = "--commit-all" ]; then
+      # Actions are called before and after this case, so our work here is already done
+      :
+    else
+      usage
+    fi
   ;;
   help)
     help

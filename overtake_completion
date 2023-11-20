@@ -42,7 +42,7 @@ _overtake_complete()
   prev=${COMP_WORDS[COMP_CWORD-1]}
 
   if [ $COMP_CWORD -eq 1 ]; then
-    COMPREPLY=( $(compgen -W "add copy delete edit help list show" -- $cur) )
+    COMPREPLY=( $(compgen -W "add copy delete edit git help list show" -- $cur) )
   elif [ $COMP_CWORD -eq 2 ]; then
     case "$prev" in
       add|copy|delete|edit|show)
@@ -50,7 +50,10 @@ _overtake_complete()
         _overtake_complete_entries
         ;;
       list)
-        COMPREPLY=( $(compgen -W "--full --tree" -- $cur) )
+        COMPREPLY=( $(compgen -W "--absolute --pretty --recipients --git-repositories" -- $cur) )
+        ;;
+      git)
+        COMPREPLY=( $(compgen -W "--commit-all --pull-all" -- $cur) )
         ;;
     esac
   fi
