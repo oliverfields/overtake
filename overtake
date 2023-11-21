@@ -497,7 +497,7 @@ fi
 [ -z "$OVERTAKE_EXTENSIONS" ] && OVERTAKE_EXTENSIONS="$OVERTAKE_DIR/extensions.sh"
 
 # Load extensions
-[ -e "$OVERTAKE_EXTNSIONS" ] && source "$OVERTAKE_EXTENSIONS"
+[ -e "$OVERTAKE_EXTENSIONS" ] && source "$OVERTAKE_EXTENSIONS"
 
 # Remove any trailing slash
 PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}"
