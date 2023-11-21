@@ -47,3 +47,5 @@ cmap wq call GPGEncryptBuffer()
 cmap ZZ call GPGEncryptBuffer()
 cmap q q!
 
+" Disable default start screen info
+set shm+=I

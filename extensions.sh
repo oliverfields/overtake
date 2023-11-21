@@ -1,16 +1,4 @@
-# Where are the encrypted files?
-PASSWORD_STORE_DIR=$HOME/.password-store
-
-# GPG key ids, separate with space for multiple, make sure your own key is in this list;)
-# overtake will automatically add PASSWORD_STORE_KEY ids to the key recipients as well, to comply with how pass does things
-PASSWORD_STORE_DEFAULT_RECIPIENTS=your@gpg.key
-
-# If yes then add, edit and delete operations will trigger a git commits and will also pull and push if there exist remotes
-#SYNC_GIT=yes
-
-
-# Everything below this line can be ignored/deleted
-
+# This file is sourced in overtake, so you can define your own functions
 
 # Override default behaviour when content is decrypted and sent to clipboard
 # Decrypted content is sent on stdin to function
@@ -21,6 +9,9 @@ PASSWORD_STORE_DEFAULT_RECIPIENTS=your@gpg.key
 
 
 # Template to prepopulate new files when using overtake add <file>
+# Must be callable either with no arguments:
+# OVERTAKE_EXT_template
+# Or with one argument of value "-", if called with this argument there is stdin content to process
 #OVERTAKE_EXT_template()
 #{
 #  echo "username=\npassword=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 13)"

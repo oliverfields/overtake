@@ -23,23 +23,30 @@ error()
 # Print help
 help()
 {
-  echo -e '
-Manage directory of GPG encrypted files.
+  echo -e 'Manage directory of GPG encrypted files and optionally any git repositories in the password store directory.
 
 The argument [file] is optional, if not specified a file selection dialogue will be opened.
 
-	\e[1madd\e[0m <file>
-		Create new file in $PASSWORD_STORE_DIR, path must be relative (not start with /). If path contains directories, these will also be created
+	\e[1madd\e[0m <file> [-|/dev/stdin]
+		Create new file in $PASSWORD_STORE_DIR, path must be relative (not start with /). If path contains directories, these will also be created. Specifying - or /dev/stdin will read contents of stdin into editor(vim) for editing and before encrypting
 
-		\e[1mExample\e[0m
+		\e[1mExamples\e[0m
 			$ overtake add gnupg.org/login
-			Creates $PASSWORD_STORE_DIR/gnupg directory if not already created, and login.gpg encrypted file
+
+			Creates $PASSWORD_STORE_DIR/gnupg.org directory if not already created, and login.gpg encrypted file
+
+			$ xkcdpass | overtake add login -
+
+			Pipes output of xkcdpass to editor, and on save writes encrypted content to $PASSWORD_STORE_DIR/login.gpg
 
 	\e[1mgit\e[0m [--commit-all|--pull-all]
 		Manually trigger git commands
 
 		--commit-all
 			Commit all changes to git repositories in password store
+
+		--list-repositories
+			List git repositories in password store
 
 		--pull-all
 			Manually trigger pulls on all git repositories in password store
@@ -53,20 +60,20 @@ The argument [file] is optional, if not specified a file selection dialogue will
 	\e[1medit\e[0m [file]
 		Decrypt file, open in vi for editing and encrypt contents back to <file>
 
-	\e[1mlist\e[0m [--absolute|--git-repositories|--pretty|--recipients]
+	\e[1mlist\e[0m [--absolute|--pretty]
 		List .gpg files in $PASSWORD_STORE_DIR, defaults to tree view
 
 		--absoulte
 			Lists full paths
 
-		--git-repositories
-			List git repositories in password store
-
 		--pretty
 			Lists password store relative and pretty paths
 
-		--recipients
-			Show recipients per .gpg file
+	\e[1mrecipients\e[0m [--sync]
+		List recipients for password store .gpg files. Recipients space separated and set in .gpg-id files, in config using setting recipients or by environment variable OVERTAKE_RECIPIENTS
+
+		--sync
+			Update recipients to match those specified. If new gpg key, a sync must be run
 
 	\e[1mshow\e[0m [file]
 		Print decrypted file to terminal
@@ -81,7 +88,7 @@ The argument [file] is optional, if not specified a file selection dialogue will
 # Print usage message
 usage()
 {
-  echo -e "Usage: overtake [add <file>copy [file]|delete [file]|edit [file]|git [--commit-all|--pull-all]|help|list [--full]|show [file]]"
+  echo -e "Usage: overtake [add <file> [-|/dev/stdin]|copy [file]|delete [file]|edit [file]|git [--commit-all|--list-repositories|--pull-all]|help|list [--absolute|--pretty]|recipients [--sync]|show [file]]"
   exit 1
 }
 
@@ -232,6 +239,7 @@ add()
 {
   # If path contains PASSWORD_STORE_DIR, remove it, so we can handle both relative and absolute paths
   file="$1"
+  pipe_input="$2"
 
   file_path_absolute="$(absolute_file_path "$file")"
   file_path_relative="$(relative_file_path "$file")"
@@ -246,9 +254,19 @@ add()
   gpg_recipients="$(get_gpg_recipients "$file_path_absolute")"
 
   if [[ $(type -t OVERTAKE_EXT_template) == function ]]; then
-    OVERTAKE_EXT_template | edit_then_encrypt "$file_path_absolute" "$gpg_recipients" "-"
+    if [ "$pipe_input" = "-" ]; then
+      OVERTAKE_EXT_template "-" < /dev/stdin | edit_then_encrypt "$file_path_absolute" "$gpg_recipients" "-"
+    else
+      OVERTAKE_EXT_template | edit_then_encrypt "$file_path_absolute" "$gpg_recipients" "-"
+    fi
   else
-    edit_then_encrypt "$file_path_absolute" "$gpg_recipients"
+    if [ "$pipe_input" = "-" ]; then
+echo hi
+      edit_then_encrypt "$file_path_absolute" "$gpg_recipients" "-" < /dev/stdin
+    else
+echo hii
+      edit_then_encrypt "$file_path_absolute" "$gpg_recipients"
+    fi
   fi
 }
 
@@ -279,12 +297,10 @@ edit_then_encrypt()
   stdin_arg="$3"
 
   if [ "$stdin_arg" = "-" ]; then
-    cmd="cat"
+    GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_VIMRC" - < /dev/stdin
   else
-    cmd="echo ''"
+    GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_VIMRC"
   fi
-
-  $cmd | GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_DIR/overtake_vimrc" -
 }
 
 
@@ -373,7 +389,7 @@ get_file_path()
 
   file_path_absolute="$(absolute_file_path "$file")"
 
-  [ -f "$file_path_absolute" ] || error "Path $file is not valid"
+  [ -f "$file_path_absolute" ] || error "Path $file not found"
 
   echo "$file_path_absolute"
 }
@@ -443,10 +459,10 @@ gpg_decrypt_file()
 # Exit if no args
 [ $# -lt 1 ] && usage
 
-config_file="$HOME/.config/overtake.conf"
+# Thanks MrYellow https://unix.stackexchange.com/a/721679
+OVERTAKE_DIR=$( cd -- "$( dirname -- "$(readlink -f "${BASH_SOURCE[0]}" || ${BASH_SOURCE[0]})" )" &> /dev/null && pwd )
 
-echo Need to have option for specifying extension file, and load it
-exit 99
+config_file="$HOME/.config/overtake.conf"
 
 # Load config
 if [ -e "$config_file" ]; then
@@ -456,11 +472,16 @@ if [ -e "$config_file" ]; then
     [[ "$line" =~ ^# ]] && continue
     [[ "$line" =~ ^\ *$ ]] && continue
 
+    # Expand home directory
+    line="${line/\~/$HOME}"
+    line="${line/\$HOME/$HOME}"
+
     case $line in
       password_store_dir=*) [ -z "$PASSWORD_STORE_DIR" ] && PASSWORD_STORE_DIR="${line#password_store_dir=}" ;;
       recipients=*) [ -z "$OVERTAKE_RECIPIENTS" ] && OVERTAKE_RECIPIENTS="${line#recipients=}" ;;
       sync_git=*) [ -z "$OVERTAKE_SYNC_GIT" ] && OVERTAKE_SYNC_GIT="${line#sync_git=}" ;;
-      overtake_dir=*) [ -z "$OVERTAKE_DIR" ] && OVERTAKE_DIR="${line#overtake_dir=}" ;;
+      vimrc_overtake=*) [ -z "$OVERTAKE_VIMRC" ] && OVERTAKE_VIMRC="${line#vimrc_overtake=}" ;;
+      overtake_extensions=*) [ -z "$OVERTAKE_EXTENSIONS" ] && OVERTAKE_EXTENSIONS="${line#overtake_extensions=}" ;;
       *)
         echo "Warning: Unknown setting $line in $config_file"
       ;;
@@ -472,18 +493,11 @@ fi
 [ -z "$PASSWORD_STORE_DIR" ] && PASSWORD_STORE_DIR="$HOME/.password-store"
 [ -z "$OVERTAKE_RECIPIENTS" ] && OVERTAKE_RECIPIENTS="your@gpg.key"
 [ -z "$OVERTAKE_SYNC_GIT" ] && OVERTAKE_SYNC_GIT="no"
-[ -z "$OVERTAKE_DIR" ] && OVERTAKE_DIR="$HOME/.local/overtake"
+[ -z "$OVERTAKE_VIMRC" ] && OVERTAKE_VIMRC="$OVERTAKE_DIR/vimrc_overtake"
+[ -z "$OVERTAKE_EXTENSIONS" ] && OVERTAKE_EXTENSIONS="$OVERTAKE_DIR/extensions.sh"
 
-# Set OVERTAKE_DIR, where the source is found
-if [ "$OVERTAKE_DIR" = "" ]; then
-  if command -v realpath &> /dev/null; then
-    OVERTAKE_DIR="$(realpath "$BASH_SOURCE")"
-  else
-    OVERTAKE_DIR="$BASH_SOURCE"
-    echo "Command realpath from Coreutils not found. Assuming overtake is installed at $OVERTAKE_DIR, but if symlinks are used this may not be correct and you may need to set overtake_dir in overtake.conf or ensure OVERTAKE_DIR environment variable is set."
-  fi
-  OVERTAKE_DIR="${OVERTAKE_DIR%/*}"
-fi
+# Load extensions
+[ -e "$OVERTAKE_EXTNSIONS" ] && source "$OVERTAKE_EXTENSIONS"
 
 # Remove any trailing slash
 PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}"
@@ -492,11 +506,14 @@ PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}"
 
 mode="$1"
 
-
 # Git pull
 case $mode in
   help)
     : # Do nothing
+  ;;
+  git)
+    # If we are using git mode, we are of course syncing
+    OVERTAKE_SYNC_GIT=yes batch_repos_cmd pull
   ;;
   *)
     batch_repos_cmd pull
@@ -506,11 +523,18 @@ esac
 
 case $mode in
   add)
-    if [ $# -ne 2 ]; then
-      echo "Error: Expected file argument"
-      usage
-    fi
-    add "$2"
+    case $# in
+      1) usage ;;
+      2) add "$2" ;;
+      3)
+        if [ "$3" = "-" ] || [ "$3" = "/dev/stdin" ]; then
+          add "$2" "-"
+        else
+          usage
+        fi
+      ;;
+      *) usage ;;
+    esac
   ;;
   edit)
     case $# in
@@ -533,14 +557,26 @@ case $mode in
         case $2 in
           --absolute) list_absolute_paths ;;
           --pretty) list_pretty_paths ;;
-          --git-repositories) list_git_repos ;;
-          --recipients) list_recipients ;;
           *) usage ;;
         esac
       ;;
       *) usage ;;
     esac
   ;;
+  recipients)
+     case $# in
+      1) list_recipients ;;
+      2)
+        if [ "$2" = "--sync" ]; then
+          echo IMPLEMENT ME TODO
+        else
+          usage
+        fi
+      ;;
+      *) usage ;;
+    esac
+  ;;
+
   show)
     case $# in
       1) show ;;
@@ -559,6 +595,8 @@ case $mode in
     if [ "$2" = "--pull-all" ] || [ "$2" = "--commit-all" ]; then
       # Actions are called before and after this case, so our work here is already done
       :
+    elif [ "$2" = "--list-repositories" ]; then
+      list_git_repos
     else
       usage
     fi
@@ -576,6 +614,10 @@ esac
 case $mode in
   help|list)
     : # Do nothing
+  ;;
+  git)
+    # If we are using git mode, we are of course syncing
+    OVERTAKE_SYNC_GIT=yes batch_repos_cmd commitall
   ;;
   *)
     batch_repos_cmd commitall

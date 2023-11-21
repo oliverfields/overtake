@@ -42,7 +42,7 @@ _overtake_complete()
   prev=${COMP_WORDS[COMP_CWORD-1]}
 
   if [ $COMP_CWORD -eq 1 ]; then
-    COMPREPLY=( $(compgen -W "add copy delete edit git help list show" -- $cur) )
+    COMPREPLY=( $(compgen -W "add copy delete edit recipients git help list show" -- $cur) )
   elif [ $COMP_CWORD -eq 2 ]; then
     case "$prev" in
       add|copy|delete|edit|show)
@@ -54,6 +54,9 @@ _overtake_complete()
         ;;
       git)
         COMPREPLY=( $(compgen -W "--commit-all --pull-all" -- $cur) )
+        ;;
+      recipients)
+        COMPREPLY=( $(compgen -W "--sync" -- $cur) )
         ;;
     esac
   fi
