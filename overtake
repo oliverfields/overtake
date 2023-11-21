@@ -63,7 +63,7 @@ The argument [file] is optional, if not specified a file selection dialogue will
 			List git repositories in password store
 
 		--pretty
-			Show tree view
+			Lists password store relative and pretty paths
 
 		--recipients
 			Show recipients per .gpg file
@@ -89,7 +89,7 @@ usage()
 # For all git repositories in password store, run batch commands
 batch_repos_cmd()
 {
-  if [ "$SYNC_GIT" != "yes" ]; then
+  if [ "$OVERTAKE_SYNC_GIT" != "yes" ]; then
     return
   fi
 
@@ -311,7 +311,7 @@ get_gpg_recipients()
   fi
 
   # Add recipients from settings also
-  recipients_string="$PASSWORD_STORE_DEFAULT_RECIPIENTS $recipients_string"
+  recipients_string="$OVERTAKE_RECIPIENTS $recipients_string"
   recipients_string="$PASSWORD_STORE_KEY $recipients_string"
 
   # Need to tidy up, remove any duplicates and verify that have recipient keys
@@ -360,7 +360,7 @@ get_file_path()
   file="$1"
 
   if [ "$2" = "" ]; then
-    prompt="Password store $PASSWORD_STORE_DIR using key $PASSWORD_STORE_DEFAULT_RECIPIENTS"
+    prompt="Password store $PASSWORD_STORE_DIR using key $OVERTAKE_RECIPIENTS"
   else
     prompt="$2"
   fi
@@ -443,14 +443,36 @@ gpg_decrypt_file()
 # Exit if no args
 [ $# -lt 1 ] && usage
 
-# Use pass default password store path, or get from environment variable
-CONFIG_FILE="$HOME/.config/overtake.conf"
-PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR:-$HOME/.password-store}"
-PASSWORD_STORE_DEFAULT_RECIPIENTS="${PASSWORD_STORE_KEY}"
-SYNC_GIT="${SYNC_GIT:-no}"
+config_file="$HOME/.config/overtake.conf"
+
+echo Need to have option for specifying extension file, and load it
+exit 99
 
 # Load config
-[ -e "$CONFIG_FILE" ] && source "$CONFIG_FILE"
+if [ -e "$config_file" ]; then
+  while read -r line; do
+
+    # Skip comments and blank lines
+    [[ "$line" =~ ^# ]] && continue
+    [[ "$line" =~ ^\ *$ ]] && continue
+
+    case $line in
+      password_store_dir=*) [ -z "$PASSWORD_STORE_DIR" ] && PASSWORD_STORE_DIR="${line#password_store_dir=}" ;;
+      recipients=*) [ -z "$OVERTAKE_RECIPIENTS" ] && OVERTAKE_RECIPIENTS="${line#recipients=}" ;;
+      sync_git=*) [ -z "$OVERTAKE_SYNC_GIT" ] && OVERTAKE_SYNC_GIT="${line#sync_git=}" ;;
+      overtake_dir=*) [ -z "$OVERTAKE_DIR" ] && OVERTAKE_DIR="${line#overtake_dir=}" ;;
+      *)
+        echo "Warning: Unknown setting $line in $config_file"
+      ;;
+    esac
+  done < "$config_file"
+fi
+
+# Set defaults if no environment variables found or values not set in config file
+[ -z "$PASSWORD_STORE_DIR" ] && PASSWORD_STORE_DIR="$HOME/.password-store"
+[ -z "$OVERTAKE_RECIPIENTS" ] && OVERTAKE_RECIPIENTS="your@gpg.key"
+[ -z "$OVERTAKE_SYNC_GIT" ] && OVERTAKE_SYNC_GIT="no"
+[ -z "$OVERTAKE_DIR" ] && OVERTAKE_DIR="$HOME/.local/overtake"
 
 # Set OVERTAKE_DIR, where the source is found
 if [ "$OVERTAKE_DIR" = "" ]; then
@@ -458,7 +480,7 @@ if [ "$OVERTAKE_DIR" = "" ]; then
     OVERTAKE_DIR="$(realpath "$BASH_SOURCE")"
   else
     OVERTAKE_DIR="$BASH_SOURCE"
-    echo "Command realpath from Coreutils not found. Assuming overtake is installed at $OVERTAKE_DIR, but if symlinks are used this may not be correct and you may need to set OVERTAKE_DIR in overtake.conf."
+    echo "Command realpath from Coreutils not found. Assuming overtake is installed at $OVERTAKE_DIR, but if symlinks are used this may not be correct and you may need to set overtake_dir in overtake.conf or ensure OVERTAKE_DIR environment variable is set."
   fi
   OVERTAKE_DIR="${OVERTAKE_DIR%/*}"
 fi
