@@ -485,10 +485,6 @@ gpg_decrypt_file()
   gpg --quiet --decrypt "$file" || error "Unable to decrypt $file, perhaps key passphrase is not cached by gpg-agent yet?"
 }
 
-
-# Exit if no args
-[ $# -lt 1 ] && usage
-
 # Thanks MrYellow https://unix.stackexchange.com/a/721679
 OVERTAKE_DIR=$( cd -- "$( dirname -- "$(readlink -f "${BASH_SOURCE[0]}" || ${BASH_SOURCE[0]})" )" &> /dev/null && pwd )
 
@@ -534,7 +530,12 @@ PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}"
 
 [ -d "$PASSWORD_STORE_DIR" ] || error "No directory at $PASSWORD_STORE_DIR"
 
-mode="$1"
+# Set mode
+if [ $# -eq 0 ]; then
+  mode="copy"
+else
+  mode="$1"
+fi
 
 # When to do git pull
 case $mode in
@@ -606,7 +607,6 @@ case $mode in
       *) usage ;;
     esac
   ;;
-
   show)
     case $# in
       1) show ;;
@@ -615,11 +615,9 @@ case $mode in
     esac
   ;;
   copy)
-    case $# in
-      1) copy ;;
-      2) copy "$2" ;;
-      *) usage ;;
-    esac
+    [ $# -lt 2 ] && copy
+    [ $# -eq 2 ] && copy "$2"
+    [ $# -gt 2 ] && usage
   ;;
   git)
     if [ "$2" = "--pull-all" ] || [ "$2" = "--commit-all" ]; then
