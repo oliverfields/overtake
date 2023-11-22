@@ -247,7 +247,7 @@ list_recipients()
 
     # Checking actual and configured are the same depends on both functions return recipients alphabetically sorted
     if [ "$actual_recipients" = "$configured_recipients" ]; then
-      echo "$file_name recipients:$actual_recipients"
+      echo "$file_name: $actual_recipients"
     else
       echo "$file_name Warning: actual recipients ($actual_recipients) do not match configured recipients ($configured_recipients) run overtake recipients --sync to re-encrypt using configured recipients"
     fi
