@@ -8,10 +8,7 @@
 #}
 
 
-# Template to prepopulate new files when using overtake add <file>
-# Must be callable either with no arguments:
-# OVERTAKE_EXT_template
-# Or with one argument of value "-", if called with this argument there is stdin content to process
+# Template to prepopulate new files with functions output, when using overtake add <file>
 #OVERTAKE_EXT_template()
 #{
 #  echo "username=\npassword=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 13)"

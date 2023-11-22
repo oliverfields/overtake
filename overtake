@@ -253,20 +253,13 @@ add()
 
   gpg_recipients="$(get_gpg_recipients "$file_path_absolute")"
 
-  if [[ $(type -t OVERTAKE_EXT_template) == function ]]; then
-    if [ "$pipe_input" = "-" ]; then
-      OVERTAKE_EXT_template "-" < /dev/stdin | edit_then_encrypt "$file_path_absolute" "$gpg_recipients" "-"
-    else
-      OVERTAKE_EXT_template | edit_then_encrypt "$file_path_absolute" "$gpg_recipients" "-"
-    fi
+  if [ "$pipe_input" = "-" ]; then
+    cmd="gpg --encrypt --out \"$file_path_absolute\" --recipient \"${gpg_recipients// /\" --recipient \"}\" -"
+    eval "$cmd"
+  elif [[ $(type -t OVERTAKE_EXT_template) == function ]]; then
+    OVERTAKE_EXT_template | edit_then_encrypt "$file_path_absolute" "$gpg_recipients" "-"
   else
-    if [ "$pipe_input" = "-" ]; then
-echo hi
-      edit_then_encrypt "$file_path_absolute" "$gpg_recipients" "-" < /dev/stdin
-    else
-echo hii
       edit_then_encrypt "$file_path_absolute" "$gpg_recipients"
-    fi
   fi
 }
 
