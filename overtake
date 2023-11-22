@@ -212,93 +212,71 @@ list_git_repos()
 }
 
 
-list_recipients()
+# Re-encrypt all gpg fiels with configured recipients
+sync_recipients()
 {
-  for encfile in $(find "$PASSWORD_STORE_DIR" -type f -name '*.gpg' | sort); do
+  # Tmp file will always contain encrypted data, but if paranoid maybe not put in tmp directory?
+  tmp_file="$(mktemp)"
 
-    echo -n "${encfile#$PASSWORD_STORE_DIR/}"
+  trap "rm -f '$tmp_file'" EXIT
 
-    gpg --decrypt --list-only --keyid-format long "$encfile" 2>&1 \
-    | while read -r line; do
-      if [[ "$line" == gpg:* ]]; then
-        :
-        #key_id="${line##* ID }"
-        #key_id="${key_id%,*}"
+  for file in $(find "$PASSWORD_STORE_DIR" -type f -name '*.gpg'); do
+    recipients="$(get_configured_recipients "$file")"
+    recipients="--recipient ${recipients// / --recipient }"
 
-        #echo -n " $key_id"
-      elif [[ "$line" == 	* ]]; then
-        echo -n " $line"
-      fi
-    done | sed 's/"[^"]*<//g ; s/>"//g ; s/$/\n/'
+    gpg --quiet --decrypt "$file" | gpg --yes --quiet $recipients --output "$tmp_file" --encrypt
+
+    mv "$tmp_file" "$file"
   done
 }
 
 
-# Try to add new encrypted file with newly generated passphrase, update git if applicable
-add()
+# List each file. For each file flag if configured recipients does not match actual gpg file recipuients
+list_recipients()
 {
-  # If path contains PASSWORD_STORE_DIR, remove it, so we can handle both relative and absolute paths
-  file="$1"
-  pipe_input="$2"
 
-  file_path_absolute="$(absolute_file_path "$file")"
-  file_path_relative="$(relative_file_path "$file")"
+  for file in $(find "$PASSWORD_STORE_DIR" -type f -name '*.gpg' | sort); do
+    actual_recipients="$(get_gpg_file_recipients "$file")"
+    configured_recipients="$(get_configured_recipients "$file")"
 
-  [ -e "$file_path_absolute" ] && error "Unable to create $file_path_absolute, it already exists"
+    [ "$actual_recipients" = "" ] && error "No recipients found in $file"
+    [ "$configured_recipients" = "" ] && error "No recipients configured for $file"
 
-  # Create directories if need be
-  # TODO trap ERR to delete dirs if things go south
-  file_directories="${file_path_absolute%/*}"
-  mkdir -p "$file_directories" || error "Unable to create $file_directories"
+    file_name="${file#$PASSWORD_STORE_DIR/}"
+    file_name="${file_name%.gpg}"
 
-  gpg_recipients="$(get_gpg_recipients "$file_path_absolute")"
-
-  if [ "$pipe_input" = "-" ]; then
-    cmd="gpg --encrypt --out \"$file_path_absolute\" --recipient \"${gpg_recipients// /\" --recipient \"}\" -"
-    eval "$cmd"
-  elif [[ $(type -t OVERTAKE_EXT_template) == function ]]; then
-    OVERTAKE_EXT_template | edit_then_encrypt "$file_path_absolute" "$gpg_recipients" "-"
-  else
-      edit_then_encrypt "$file_path_absolute" "$gpg_recipients"
-  fi
+    # Checking actual and configured are the same depends on both functions return recipients alphabetically sorted
+    if [ "$actual_recipients" = "$configured_recipients" ]; then
+      echo "$file_name recipients:$actual_recipients"
+    else
+      echo "$file_name Warning: actual recipients ($actual_recipients) do not match configured recipients ($configured_recipients) run overtake recipients --sync to re-encrypt using configured recipients"
+    fi
+  done
 }
 
 
-# Decrypt, edit and reencrypt file, file passed as argument or selected from fzf
-edit()
+# Get actual recipients that can decode a gpg file
+get_gpg_file_recipients()
 {
-  file="$(get_file_path "$1")"
+  local file="$1"
+  recipients=""
 
-  [ "$file" = "" ] && exit 0
-
-  gpg_recipients="$(get_gpg_recipients "$file")"
-
-  gpg_decrypt_file "$file" | edit_then_encrypt "$file" "$gpg_recipients" "-"
+  gpg --decrypt --list-only --keyid-format long "$file" 2>&1 \
+  | while read -r line; do
+    if [[ "$line" == gpg:* ]]; then
+      :
+    elif [[ "$line" == 	* ]]; then
+      recipient="${line#*<}"
+      recipient="${recipient%>\"}"
+      echo "$recipient"
+    fi
+  done | sort | tr '\n' ' ' | sed 's/\ $//'
 }
 
 
-# Allow user to edit data and save it encrypted to disk
-# Must be callable in two ways
-# 1. With path to save data to and the recipients (CSV if multiple) to encrypt to
-#    E.g edit_then_encrypt "/tmp/myfile.gpg" "your@email.com,another@email.com"
-# 2. With the path to save to, recipients andand "-" indicating stdin, and data piped into the funtion
-#    E.g echo "My content" | edit_then_encrypt "/tmp/myfile.gpg" "me@you.com" "-"
-edit_then_encrypt()
-{
-  save_path="$1"
-  recipients="$2"
-  stdin_arg="$3"
-
-  if [ "$stdin_arg" = "-" ]; then
-    GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_VIMRC" - < /dev/stdin
-  else
-    GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_VIMRC"
-  fi
-}
-
-
-# Given a path look up until find a .gpg-id file, this contains the recipients, one per line
-get_gpg_recipients()
+# Get all configured recipients from .gpg-id files, $OVERTAKE_RECIPIENTS and $PASSWORD_STORE_KEY
+# Veryfi have gpg key available for each recipient
+get_configured_recipients()
 {
   file="$1"
   dir_path="${file%/*}"
@@ -320,8 +298,8 @@ get_gpg_recipients()
   fi
 
   # Add recipients from settings also
-  recipients_string="$OVERTAKE_RECIPIENTS $recipients_string"
-  recipients_string="$PASSWORD_STORE_KEY $recipients_string"
+  recipients_string="$OVERTAKE_RECIPIENTS $PASSWORD_STORE_KEY $recipients_string"
+  recipients_string="${recipients_string/  / }"
 
   # Need to tidy up, remove any duplicates and verify that have recipient keys
   recipients_tmp_array=( $recipients_string )
@@ -353,13 +331,72 @@ get_gpg_recipients()
     error "No public keys match $missing_keys_string, unable to process $file"
   fi
 
-  recipient_keys=""
   for key in "${!recipients[@]}"; do
-    recipient_keys="$recipient_keys $key"
-  done
-  recipient_keys="${recipient_keys# }"
+    echo "$key"
+  done | sort | tr '\n' ' ' | sed 's/\ $//'
+}
 
-  echo -n "$recipient_keys"
+
+# Try to add new encrypted file with newly generated passphrase, update git if applicable
+add()
+{
+  # If path contains PASSWORD_STORE_DIR, remove it, so we can handle both relative and absolute paths
+  file="$1"
+  pipe_input="$2"
+
+  file_path_absolute="$(absolute_file_path "$file")"
+  file_path_relative="$(relative_file_path "$file")"
+
+  [ -e "$file_path_absolute" ] && error "Unable to create $file_path_absolute, it already exists"
+
+  # Create directories if need be
+  # TODO trap ERR to delete dirs if things go south
+  file_directories="${file_path_absolute%/*}"
+  mkdir -p "$file_directories" || error "Unable to create $file_directories"
+
+  gpg_recipients="$(get_configured_recipients "$file_path_absolute")"
+
+  if [ "$pipe_input" = "-" ]; then
+    cmd="gpg --encrypt --out \"$file_path_absolute\" --recipient \"${gpg_recipients// /\" --recipient \"}\" -"
+    eval "$cmd"
+  elif [[ $(type -t OVERTAKE_EXT_template) == function ]]; then
+    OVERTAKE_EXT_template | edit_then_encrypt "$file_path_absolute" "$gpg_recipients" "-"
+  else
+      edit_then_encrypt "$file_path_absolute" "$gpg_recipients"
+  fi
+}
+
+
+# Decrypt, edit and reencrypt file, file passed as argument or selected from fzf
+edit()
+{
+  file="$(get_file_path "$1")"
+
+  [ "$file" = "" ] && exit 0
+
+  gpg_recipients="$(get_configured_recipients "$file")"
+
+  gpg_decrypt_file "$file" | edit_then_encrypt "$file" "$gpg_recipients" "-"
+}
+
+
+# Allow user to edit data and save it encrypted to disk
+# Must be callable in two ways
+# 1. With path to save data to and the recipients (CSV if multiple) to encrypt to
+#    E.g edit_then_encrypt "/tmp/myfile.gpg" "your@email.com,another@email.com"
+# 2. With the path to save to, recipients andand "-" indicating stdin, and data piped into the funtion
+#    E.g echo "My content" | edit_then_encrypt "/tmp/myfile.gpg" "me@you.com" "-"
+edit_then_encrypt()
+{
+  save_path="$1"
+  recipients="$2"
+  stdin_arg="$3"
+
+  if [ "$stdin_arg" = "-" ]; then
+    GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_VIMRC" - < /dev/stdin
+  else
+    GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_VIMRC"
+  fi
 }
 
 
@@ -499,7 +536,7 @@ PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}"
 
 mode="$1"
 
-# Git pull
+# When to do git pull
 case $mode in
   help)
     : # Do nothing
@@ -561,7 +598,7 @@ case $mode in
       1) list_recipients ;;
       2)
         if [ "$2" = "--sync" ]; then
-          echo IMPLEMENT ME TODO
+          sync_recipients
         else
           usage
         fi
@@ -603,9 +640,9 @@ case $mode in
 esac
 
 
-# Git commit
+# When to do git commit
 case $mode in
-  help|list)
+  help|list|show|copy)
     : # Do nothing
   ;;
   git)
