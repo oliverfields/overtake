@@ -475,14 +475,14 @@ show()
   local option="notset"
 
   case $# in
-    0) file="$(get_file_path)" ;;
+    0) file="" ;;
     1)
       # Is first arg a file or an option
       if [[ "$1" =~ ^(--no-clear|-n|--copy|-c)$ ]]; then
         option="$1"
-        file="$(get_file_path)"
+        file="$2"
       else
-        file="$(get_file_path "$1")"
+        file="$1"
       fi
     ;;
     2)
@@ -491,8 +491,6 @@ show()
     ;;
     *) usage ;;
   esac
-
-echo TODO Think second fzf is coming from below here
 
   # Default, print decrypted content to terminal
   if [ "$option" = "notset" ] || [ "$option" = "--no-clear" ] || [ "$option" = "-n" ]; then
