@@ -39,6 +39,15 @@ The argument [file] is optional, if not specified a file selection dialogue will
 
 			Pipes output of xkcdpass to editor, and on save writes encrypted content to $PASSWORD_STORE_DIR/login.gpg
 
+	\e[1mcp\e[0m [--force|-f|--recursive|-r] <source path> <target path>
+		Copy files or directories
+
+		--force, -f
+			Overwrite target path even if it already exists
+
+		--recursive, -r
+			Copy directories recursively
+
 	\e[1mgit\e[0m [--commit-all|--pull-all]
 		Manually trigger git commands
 
@@ -50,12 +59,6 @@ The argument [file] is optional, if not specified a file selection dialogue will
 
 		--pull-all
 			Manually trigger pulls on all git repositories in password store
-
-	\e[1mcopy\e[0m [file]
-		Copies decrypted contents to clipboard
-
-	\e[1mdelete\e[0m [file]
-		Deletes file from $PASSWORD_STORE_DIR
 
 	\e[1medit\e[0m [file]
 		Decrypt file, open in vi for editing and encrypt contents back to <file>
@@ -69,14 +72,35 @@ The argument [file] is optional, if not specified a file selection dialogue will
 		--pretty
 			Lists password store relative and pretty paths
 
+	\e[1mmv\e[0m [--force|-f] <source path> <target path>
+		Move files or directories
+
+		--force, -f
+			Overwrite target path even if it already exists
+
 	\e[1mrecipients\e[0m [--sync]
 		List recipients for password store .gpg files. Recipients space separated and set in .gpg-id files, in config using setting recipients or by environment variable OVERTAKE_RECIPIENTS
 
 		--sync
 			Update recipients to match those specified. If new gpg key, a sync must be run
 
-	\e[1mshow\e[0m [file]
-		Print decrypted file to terminal
+	\e[1mrm\e[0m [--force|-f|--recursive|-r] <path>
+		Remove/delete files or directories
+
+		--force, -f
+			Remove/delete path even if it already exists
+
+		--recursive, -r
+			Remove/delete directories recursively
+
+	\e[1mshow\e[0m <-copy|-c|--no-clear|-n> <file>
+		Default select file from list and print decrypted contents to terminal
+
+		--copy, -c
+			Copy decrypted file to clipboard
+
+		--no-clear, -n
+			Disable clear screen prompt
 
 	\e[1mhelp\e[0m
 		This text
@@ -88,7 +112,16 @@ The argument [file] is optional, if not specified a file selection dialogue will
 # Print usage message
 usage()
 {
-  echo -e "Usage: overtake [add <file> [-|/dev/stdin]|copy [file]|delete [file]|edit [file]|git [--commit-all|--list-repositories|--pull-all]|help|list [--absolute|--pretty]|recipients [--sync]|show [file]]"
+  echo -e "Usage: overtake 
+	add <file> [-|/dev/stdin]
+	cr [--force|--recursive] <source file> <target file>
+	edit [file]
+	git [--commit-all|--list-repositories|--pull-all]
+	help
+	list [--absolute|--pretty]
+	mv [--force] <source file> <target file>
+	recipients [--sync]|show [-copy|--no-clear] [file]
+	rm [--force|--recursive] [file]"
   exit 1
 }
 
@@ -436,13 +469,52 @@ print_decrypted_content()
   gpg_decrypt_file "$file"
 }
 
-
+# Decrypt and show to user either in terminal or via clipboard
 show()
 {
-  print_decrypted_content "$1"
-  echo ""
-  read -p "Press any key to clear terminal and continue.." key
-  clear
+  local option="notset"
+
+  case $# in
+    0) file="$(get_file_path)" ;;
+    1)
+      # Is first arg a file or an option
+      if [[ "$1" =~ ^(--no-clear|-n|--copy|-c)$ ]]; then
+        option="$1"
+        file="$(get_file_path)"
+      else
+        file="$(get_file_path "$1")"
+      fi
+    ;;
+    2)
+      option="$1"
+      file="$2"
+    ;;
+    *) usage ;;
+  esac
+
+echo TODO Think second fzf is coming from below here
+
+  # Default, print decrypted content to terminal
+  if [ "$option" = "notset" ] || [ "$option" = "--no-clear" ] || [ "$option" = "-n" ]; then
+    print_decrypted_content "$file"
+
+    # Unless disabled, show prompt to clear terminal
+    if [ "$option" = "notset" ]; then
+      echo ""
+      read -p "Press any key to clear terminal and continue.." key
+      clear
+    fi
+  elif [ "$option" = "--copy" ] || [ "$option" = "-c" ]; then
+    # If config file has defined a function for clipboard, use it to copy
+    if [[ $(type -t OVERTAKE_EXT_clipboard) == function ]]; then
+      print_decrypted_content "$file" | OVERTAKE_EXT_clipboard
+    # Else emulate pass behaviour by just copying 1st line to clipboard
+    else
+      print_decrypted_content "$file" | head -n1 | tr -d '\n' | xsel --clipboard
+    fi 
+  else
+    usage
+  fi
 }
 
 
@@ -457,24 +529,6 @@ delete()
   [ -e "$file" ] || error "File $file does not exist"
 
   rm "$file"
-}
-
-
-# Copy key to clipboard
-copy()
-{
-  file="$(get_file_path "$1")"
-
-  # No file selected
-  [ "$file" = "" ] && exit 0
-
-  # If config file has defined a function for clipboard, use it to copy
-  if [[ $(type -t OVERTAKE_EXT_clipboard) == function ]]; then
-    print_decrypted_content "$file" | OVERTAKE_EXT_clipboard
-  # Else emulate pass behaviour by just copying 1st line to clipboard
-  else
-    print_decrypted_content "$file" | head -n1 | tr -d '\n' | xsel --clipboard
-  fi
 }
 
 
@@ -532,7 +586,7 @@ PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}"
 
 # Set mode
 if [ $# -eq 0 ]; then
-  mode="copy"
+  mode="show"
 else
   mode="$1"
 fi
@@ -574,13 +628,6 @@ case $mode in
       *) usage ;;
     esac
   ;;
-  delete)
-     case $# in
-      1) delete ;;
-      2) delete "$2" ;;
-      *) usage ;;
-    esac
-  ;;
   list)
     case $# in
       1) list_tree ;;
@@ -609,15 +656,12 @@ case $mode in
   ;;
   show)
     case $# in
-      1) show ;;
+      0|1) show ;;
       2) show "$2" ;;
+      3) show "$2" "$3" ;;
       *) usage ;;
     esac
-  ;;
-  copy)
-    [ $# -lt 2 ] && copy
-    [ $# -eq 2 ] && copy "$2"
-    [ $# -gt 2 ] && usage
+
   ;;
   git)
     if [ "$2" = "--pull-all" ] || [ "$2" = "--commit-all" ]; then
@@ -628,6 +672,15 @@ case $mode in
     else
       usage
     fi
+  ;;
+  cp)
+    echo IMPLEMENT ME
+  ;;
+  mv)
+    echo IMPLEMENT ME
+  ;;
+  rm)
+    echo IMPLEMENT ME
   ;;
   help)
     help

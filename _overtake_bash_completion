@@ -38,26 +38,40 @@ _overtake_complete()
   local cur prev
 
   COMPREPLY=()
+  mode=${COMP_WORDS[1]}
   cur=${COMP_WORDS[COMP_CWORD]}
   prev=${COMP_WORDS[COMP_CWORD-1]}
 
   if [ $COMP_CWORD -eq 1 ]; then
-    COMPREPLY=( $(compgen -W "add copy delete edit recipients git help list show" -- $cur) )
-  elif [ $COMP_CWORD -eq 2 ]; then
-    case "$prev" in
-      add|copy|delete|edit|show)
+    COMPREPLY=( $(compgen -W "add edit recipients git help list show rm cp mv" -- $cur) )
+    _overtake_complete_entries
+  elif [ $COMP_CWORD -gt 1 ]; then
+    case $mode in
+      add|delete|edit)
         # Complete *.gpg file paths
         _overtake_complete_entries
-        ;;
+      ;;
+      show)
+        [ ${#COMP_WORDS[@]} -eq 3 ] && COMPREPLY=( $(compgen -W "--copy -c --no-clear -n" -- $cur))
+        _overtake_complete_entries
+      ;;
+      cp|rm)
+        if [ ${#COMP_WORDS[@]} -eq 3 ] || [ ${#COMP_WORDS[@]} -eq 4 ]; then COMPREPLY=( $(compgen -W "--force -f --recursive -r" -- $cur)); fi
+        _overtake_complete_entries
+      ;;
+      mv)
+        [ ${#COMP_WORDS[@]} -eq 3 ] && COMPREPLY=( $(compgen -W "--force -f" -- $cur))
+        _overtake_complete_entries
+      ;;
       list)
         COMPREPLY=( $(compgen -W "--absolute --pretty" -- $cur) )
-        ;;
+      ;;
       git)
         COMPREPLY=( $(compgen -W "--list-repositories --commit-all --pull-all" -- $cur) )
-        ;;
+      ;;
       recipients)
         COMPREPLY=( $(compgen -W "--sync" -- $cur) )
-        ;;
+      ;;
     esac
   fi
 
