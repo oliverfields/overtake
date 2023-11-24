@@ -1,0 +1,94 @@
+#!/bin/bash
+
+
+select_directory_option() {
+  local selected_dir="$1"
+  local options=()
+  local back_dir=${selected_dir%/*}
+
+  # Can't go further up than password store
+  if [ "$back_dir" = "${PASSWORD_STORE_DIR%/*}" ]; then
+    back_dir=""
+  else
+    options+=("BACK	DIRECTORY:$back_dir")
+  fi
+
+  options+=("NEW DIRECTORY	DIRECTORY_NEW:$selected_dir")
+  options+=("NEW SECRET	SECRET_NEW:$selected_dir")
+  options+=("QUIT	QUIT")
+
+  for item in $(echo $selected_dir/*); do
+
+    # Skip root dir
+    [ "$item" = "$PASSWORD_STORE_DIR" ] && continue
+
+    if [ -f "$item" ]; then
+      [ "${item##*.}" = "gpg" ] || continue
+      name="${item#$selected_dir/}"
+      name="${name%.gpg}"
+      options+=("$name	SECRET:$item")
+    elif [ -d "$item" ]; then
+      name="${item#$selected_dir/}/"
+      options+=("$name	DIRECTORY:$item")
+    fi
+  done
+
+  printf '%s\n' "${options[@]}" | select_option "info text man" "$back_dir"
+}
+
+
+select_secret_option() {
+  local selected_secret="$1"
+  local options=()
+  local back_dir=${selected_secret%/*}
+
+  # Can't go further up than password store
+  if [ "$back_dir" = "${PASSWORD_STORE_DIR%/*}" ]; then
+    back_dir=""
+  else
+    options+=("BACK	DIRECTORY:$back_dir")
+  fi
+
+  options+=("COPY	SECRET_COPY:$selected_secret")
+  options+=("SHOW	SECRET_SHOW:$selected_secret")
+  options+=("EDIT	SECRET_EDIT:$selected_secret")
+  options+=("RENAME	SECRET_RENAME:$selected_secret")
+  options+=("MOVE	SECRET_MOVE:$selected_secret")
+  options+=("DELETE	SECRET_DELETE:$selected_secret")
+  options+=("QUIT	QUIT")
+
+  printf '%s\n' "${options[@]}" | select_option "info_text_man" "$back_dir"
+}
+
+
+select_option() {
+  local info_text="$1"
+  local back_dir="$2"
+
+  fzf --delimiter '	' --with-nth 1 --bind 'enter:execute(echo {2})+abort' --bind 'right:execute(echo {2})+abort' --bind "left:execute(echo DIRECTORY:$back_dir)+abort" "--header=dd$info_text" --no-sort --tac
+}
+
+
+PASSWORD_STORE_DIR="$HOME/.password-store"
+selected_option="DIRECTORY:${PASSWORD_STORE_DIR%/}"
+
+while true; do
+
+  action="${selected_option%%:*}"
+  item="${selected_option#$action:}"
+
+#echo yy $selected_option $action
+#list_directory_options "$item"
+  case $action in
+    BACK) echo dir me ;;
+    QUIT) exit 0 ;;
+    DIRECTORY) selected_option="$(select_directory_option "$item")" ;;
+    SECRET) selected_option="$(select_secret_option "$item")" ;;
+    *) echo "Unknown action $action, aborting.."; exit 1 ;;
+  esac
+
+  echo $selected_option
+
+  [ "$selected_option" = "" ] && break
+done
+
