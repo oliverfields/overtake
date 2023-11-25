@@ -1,0 +1,11 @@
+#!/bin/bash
+
+#overtake show $HOME/.password-store/shared/hbo.gpg
+#exit 0
+c=0
+while true; do
+let "c+=1"
+[ $c -eq 10000 ] && break
+[ $c -eq 10 ] && overtake show -n $HOME/.password-store/shared/hbo.gpg
+#[ $c -eq 10 ] && pass show $HOME/.password-store/shared/hbo.gpg
+done

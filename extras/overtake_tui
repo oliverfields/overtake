@@ -90,6 +90,8 @@ select_option() {
 PASSWORD_STORE_DIR="$HOME/.password-store"
 selected_option="DIRECTORY:${PASSWORD_STORE_DIR%/}"
 
+export OVERTAKE_SYNC_GIT=no
+
 blue=$'\e[0;34;40m'
 lime=$'\e[0;32;40m'
 end=$'\e[0m'
@@ -106,7 +108,7 @@ while true; do
     DIRECTORY) selected_option="$(select_directory_option "$item")" ;;
     SECRET) selected_option="$(select_secret_option "$item")" ;;
     SECRET_COPY)
-      overtake show --copy "$item"
+      overtake show -n "$item"
       read -p "Copied $name secret to clipboard, press any key to continue.." -r x
       selected_option="SECRET:${item#$PASSWORD_STORE_DIR/}"
     ;;
