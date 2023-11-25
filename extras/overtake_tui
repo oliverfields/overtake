@@ -1,32 +1,35 @@
 #!/bin/bash
 
+# TUI based on fzf for managing an overtake secrets store
+
 
 select_directory_option() {
   local selected_dir="$1"
   local options=()
   local files=()
   local directories=()
-  local back_dir=${selected_dir%/*}
+  local back_dir="${selected_dir%/}"
+  back_dir=${back_dir%/*}
 
-  # Can't go further up than password store
-  if [ "$back_dir" = "${PASSWORD_STORE_DIR%/*}" ]; then
-    back_dir=""
-  elif [ "$selected_dir" = "" ]; then
-    selected_dir="$PASSWORD_STORE_DIR"
+  options+=("${lime}QUIT${end}	QUIT")
+
+  if [ "$selected_dir" = "$SECRETS_DIR" ]; then
+    back_dir="$SECRETS_DIR"
   else
     options+=("${lime}BACK${end}	DIRECTORY:$back_dir")
+    options+=("${lime}DELETE DIRECTORY${end}	DIRECTORY_DELETE:$selected_dir")
+    options+=("${lime}MOVE DIRECTORY implement${end}	MOVE:$selected_dir")
+    options+=("${lime}RENAME DIRECTORY implement${end}	MOVE:$selected_dir")
   fi
 
   options+=("${lime}NEW DIRECTORY${end}	DIRECTORY_NEW:$selected_dir")
   options+=("${lime}NEW SECRET${end}	SECRET_NEW:$selected_dir")
-  options+=("${lime}RENAME DIRECTORY${end}	DIRECTORY_RENAME:$selected_dir")
-  options+=("${lime}QUIT${end}	QUIT")
 
   # List directories
   for item in $(echo $selected_dir/*); do
 
     # Skip root dir
-    [ "$item" = "$PASSWORD_STORE_DIR" ] && continue
+    [ "$item" = "$SECRETS_DIR" ] && continue
 
     if [ -f "$item" ]; then
       [ "${item##*.}" = "gpg" ] || continue
@@ -39,10 +42,10 @@ select_directory_option() {
     fi
   done
 
-  if [ "$selected_dir" = "$PASSWORD_STORE_DIR" ]; then
-    info_text="Password store: $PASSWORD_STORE_DIR"
+  if [ "$selected_dir" = "$SECRETS_DIR" ]; then
+    info_text="Password store: $SECRETS_DIR"
   else
-    info_text="Directory: ${selected_dir#$PASSWORD_STORE_DIR/}"
+    info_text="Directory: ${selected_dir#$SECRETS_DIR/}"
   fi
 
   {
@@ -56,24 +59,22 @@ select_directory_option() {
 select_secret_option() {
   local selected_secret="$1"
   local options=()
-  local back_dir=${selected_secret%/*}
-  local info_text=${selected_secret#$PASSWORD_STORE_DIR/}
-  info_text="Secret: ${info_text%.gpg}"
+  local secret_name=${selected_secret#$SECRETS_DIR/}
+  local back_dir="${selected_secret%/*.gpg}"
+
+  secret_name="${secret_name%.gpg}"
+  info_text="Secret: $secret_name"
 
   # Can't go further up than password store
-  if [ "$back_dir" = "${PASSWORD_STORE_DIR%/*}" ]; then
-    back_dir=""
-  else
-    options+=("${lime}BACK$end	DIRECTORY:$back_dir")
-  fi
+  [ "$back_dir" = "${SECRETS_DIR}" ] || options+=("${lime}BACK$end	DIRECTORY:$back_dir")
 
-  options+=("${lime}COPY$end	SECRET_COPY:$selected_secret")
-  options+=("${lime}SHOW$end	SECRET_SHOW:$selected_secret")
-  options+=("${lime}EDIT$end	SECRET_EDIT:$selected_secret")
-  options+=("${lime}RENAME$end	SECRET_RENAME:$selected_secret")
-  options+=("${lime}MOVE$end	SECRET_MOVE:$selected_secret")
-  options+=("${lime}DELETE$end	SECRET_DELETE:$selected_secret")
   options+=("${lime}QUIT$end	QUIT")
+  options+=("${lime}DELETE SECRET$end	SECRET_DELETE:$selected_secret")
+  options+=("${lime}MOVE SECRET implement$end	MOVE:$selected_secret")
+  options+=("${lime}RENAME SECRET implement$end	RENAME:$selected_secret")
+  options+=("${lime}EDIT SECRET$end	SECRET_EDIT:$selected_secret")
+  options+=("${lime}SHOW SECRET$end	SECRET_SHOW:$selected_secret")
+  options+=("${lime}COPY SECRET$end	SECRET_COPY:$selected_secret")
 
   printf '%s\n' "${options[@]}" | select_option "$info_text" "$back_dir"
 }
@@ -84,33 +85,128 @@ select_option() {
   local back_dir="$2"
 
   fzf --ansi --delimiter '	' --with-nth 1 --bind 'enter:execute(echo {2})+abort' --bind 'right:execute(echo {2})+abort' --bind "left:execute(echo DIRECTORY:$back_dir)+abort" "--header=$info_text" --no-sort --tac
+  #fzf --ansi --delimiter '	' --bind 'enter:execute(echo {2})+abort' --bind 'right:execute(echo {2})+abort' --bind "left:execute(echo DIRECTORY:$back_dir)+abort" "--header=$info_text" --no-sort --tac
 }
 
 
-PASSWORD_STORE_DIR="$HOME/.password-store"
-selected_option="DIRECTORY:${PASSWORD_STORE_DIR%/}"
+create_directories() {
+  local item="$1"
 
+  if [ "$item" != "$SECRETS_DIR" ]; then
+    relative_directory_path="${item#$SECRETS_DIR}"
+    relative_directory_path="${relative_directory_path%/*.gpg}"
+    relative_directory_path="${relative_directory_path#/}/"
+  else
+    relative_directory_path=""
+  fi
+
+  read -p "New directory name: $relative_directory_path" -r new_dir
+  new_dir="$item/${new_dir#/}"
+  new_dir="${new_dir%/}"
+  if [ -e "$new_dir" ]; then
+    echo "Unable to create $new_dir, it already exists, Enter to continue.."
+    read -r anykey
+    return 1
+  fi
+  mkdir -p "$new_dir" || return 1
+}
+
+
+create_secret() {
+  local parent_dir="$1"
+
+  read -p "New secret name: " -r new_secret
+
+  # Make sure has gpg ending
+  new_secret="${new_secret%.gpg}.gpg"
+
+  if [ -e "$parent_dir/$new_secret" ]; then
+    echo "Unable to create $parent_dir/$new_secret, it already exists, Enter to continue.."
+    read -r anykey
+    return 1
+  fi
+  overtake add "$parent_dir/$new_secret"
+}
+
+
+move() {
+:
+}
+
+
+SECRETS_DIR="$HOME/.password-store"
+# Need to set initial ACTION:PATH for while loop
+selected_option="DIRECTORY:${SECRETS_DIR%/}"
+
+# Overtake likes to keep things synced, but the current circumstance, disable it until needed
 export OVERTAKE_SYNC_GIT=no
 
+# Pretty colors for fzf output
 blue=$'\e[0;34;40m'
 lime=$'\e[0;32;40m'
 end=$'\e[0m'
 
+# This is where it happens, each iteration the loop examines $selected_option
+# $selected_option is in format ACTION:PATH
+# Action decides what happens to PATH
+# Each action must set $selected_option to a new ACTION:PATH, or break the loop
 while true; do
 
   action="${selected_option%%:*}"
   item="${selected_option#$action:}"
-  name="${item#$PASSWORD_STORE_DIR/}"
+  name="${item#$SECRETS_DIR/}"
   name="${name%.gpg}"
 
   case $action in
     QUIT) exit 0 ;;
     DIRECTORY) selected_option="$(select_directory_option "$item")" ;;
+    DIRECTORY_NEW)
+      create_directories "$item"
+      selected_option="DIRECTORY:$item"
+    ;;
+    DIRECTORY_DELETE)
+      # This is not a function because it needs to be able to prompt for user input
+
+      rmdir "$item" &> /dev/null
+      if [ $? -eq 0 ]; then
+        return_dir="${item%/*}"
+      else
+        echo "Directory $item is not empty, force delete? [yes|NO]"
+        read -r yn
+        if [ "$yn" = "yes" ]; then
+          rm -Rf "$item"
+          return_dir="${item%/*}"
+        else
+          return_dir="$item"
+        fi
+      fi
+      selected_option="DIRECTORY:$return_dir"
+    ;;
+    SECRET_NEW)
+      create_secret "$item"
+      selected_option="DIRECTORY:$item"
+    ;;
     SECRET) selected_option="$(select_secret_option "$item")" ;;
     SECRET_COPY)
-      overtake show -n "$item"
-      read -p "Copied $name secret to clipboard, press any key to continue.." -r x
-      selected_option="SECRET:${item#$PASSWORD_STORE_DIR/}"
+      overtake show --copy "$item" > /dev/null
+      read -p "Copied $name secret to clipboard, press Enter to continue.." -r x
+      selected_option="SECRET:${item}"
+    ;;
+    SECRET_DELETE)
+      rm "$item"
+      selected_option="DIRECTORY:${item%/*}"
+    ;;
+    MOVE)
+      move "$item"
+      selected_option="DIRECTORY:${item%/*}"
+    ;;
+    SECRET_EDIT)
+      overtake edit "$item"
+      selected_option="DIRECTORY:$item"
+    ;;
+    SECRET_SHOW)
+      overtake show "$item"
+      selected_option="DIRECTORY:$item"
     ;;
     *) echo "Unknown action $action, aborting.."; exit 1 ;;
   esac
