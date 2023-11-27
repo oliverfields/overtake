@@ -13,13 +13,13 @@ select_directory_option() {
 
   options+=("${lime}QUIT${end}	QUIT")
 
-  if [ "$selected_dir" = "$SECRETS_DIR" ]; then
-    back_dir="$SECRETS_DIR"
+  if [ "$selected_dir" = "$OVERTAKE_VAULT_DIR" ]; then
+    back_dir="$OVERTAKE_VAULT_DIR"
   else
     options+=("${lime}BACK${end}	DIRECTORY:$back_dir")
     options+=("${lime}DELETE DIRECTORY${end}	DIRECTORY_DELETE:$selected_dir")
-    options+=("${lime}MOVE DIRECTORY implement${end}	MOVE:$selected_dir")
-    options+=("${lime}RENAME DIRECTORY implement${end}	MOVE:$selected_dir")
+    options+=("${lime}MOVE DIRECTORY${end}	MOVE:$selected_dir")
+    #options+=("${lime}RENAME DIRECTORY${end}	MOVE:$selected_dir")
   fi
 
   options+=("${lime}NEW DIRECTORY${end}	DIRECTORY_NEW:$selected_dir")
@@ -29,7 +29,7 @@ select_directory_option() {
   for item in $(echo $selected_dir/*); do
 
     # Skip root dir
-    [ "$item" = "$SECRETS_DIR" ] && continue
+    [ "$item" = "$OVERTAKE_VAULT_DIR" ] && continue
 
     if [ -f "$item" ]; then
       [ "${item##*.}" = "gpg" ] || continue
@@ -42,10 +42,12 @@ select_directory_option() {
     fi
   done
 
-  if [ "$selected_dir" = "$SECRETS_DIR" ]; then
-    info_text="Password store: $SECRETS_DIR"
+  if [ "$selected_dir" = "$OVERTAKE_VAULT_DIR" ]; then
+    info_text="Vault: $OVERTAKE_VAULT_DIR"
+  elif [ -d "$selected_dir" ]; then
+    info_text="Directory: ${selected_dir#$OVERTAKE_VAULT_DIR/}"
   else
-    info_text="Directory: ${selected_dir#$SECRETS_DIR/}"
+    info_text="Secret: ${selected_dir#$OVERTAKE_VAULT_DIR/}"
   fi
 
   {
@@ -59,19 +61,19 @@ select_directory_option() {
 select_secret_option() {
   local selected_secret="$1"
   local options=()
-  local secret_name=${selected_secret#$SECRETS_DIR/}
+  local secret_name=${selected_secret#$OVERTAKE_VAULT_DIR/}
   local back_dir="${selected_secret%/*.gpg}"
 
   secret_name="${secret_name%.gpg}"
   info_text="Secret: $secret_name"
 
   # Can't go further up than password store
-  [ "$back_dir" = "${SECRETS_DIR}" ] || options+=("${lime}BACK$end	DIRECTORY:$back_dir")
+  [ "$back_dir" = "${OVERTAKE_VAULT_DIR}" ] || options+=("${lime}BACK$end	DIRECTORY:$back_dir")
 
   options+=("${lime}QUIT$end	QUIT")
   options+=("${lime}DELETE SECRET$end	SECRET_DELETE:$selected_secret")
-  options+=("${lime}MOVE SECRET implement$end	MOVE:$selected_secret")
-  options+=("${lime}RENAME SECRET implement$end	RENAME:$selected_secret")
+  options+=("${lime}MOVE SECRET$end	MOVE:$selected_secret")
+  #options+=("${lime}RENAME SECRET$end	MOVE:$selected_secret")
   options+=("${lime}EDIT SECRET$end	SECRET_EDIT:$selected_secret")
   options+=("${lime}SHOW SECRET$end	SECRET_SHOW:$selected_secret")
   options+=("${lime}COPY SECRET$end	SECRET_COPY:$selected_secret")
@@ -92,8 +94,8 @@ select_option() {
 create_directories() {
   local item="$1"
 
-  if [ "$item" != "$SECRETS_DIR" ]; then
-    relative_directory_path="${item#$SECRETS_DIR}"
+  if [ "$item" != "$OVERTAKE_VAULT_DIR" ]; then
+    relative_directory_path="${item#$OVERTAKE_VAULT_DIR}"
     relative_directory_path="${relative_directory_path%/*.gpg}"
     relative_directory_path="${relative_directory_path#/}/"
   else
@@ -115,35 +117,73 @@ create_directories() {
 create_secret() {
   local parent_dir="$1"
 
-  read -p "New secret name: " -r new_secret
+  while true; do
 
-  # Make sure has gpg ending
-  new_secret="${new_secret%.gpg}.gpg"
+    echo -n 'New secret name: '
+    read -r filename
 
-  if [ -e "$parent_dir/$new_secret" ]; then
-    echo "Unable to create $parent_dir/$new_secret, it already exists, Enter to continue.."
-    read -r anykey
-    return 1
-  fi
-  overtake add "$parent_dir/$new_secret"
+    filepath="${OVERTAKE_VAULT_DIR%/}/${filename%.gpg}.gpg"
+
+    if [ -e "$filepath" ]; then
+      echo "Secret $filename already exists, retry? [YES|no]"
+      read -r yn
+      [ "$yn" = "no" ] && exit
+      continue
+    fi
+
+    #echo -n 'Use template for username and passphrase? [YES|no] '
+    #read -r create_username_passphrase
+
+    # Want to edit file manually from just set empty template
+    #if [ "${create_username_passphrase:0:1}" = "n" ]; then
+    #  template=''
+    #  break
+    #fi
+
+    echo -n 'User: '
+    read -r user
+
+    echo -n 'Passphrase (empty to generate one): '
+    read -r passphrase
+
+    if [ "$passphrase" = "" ]; then
+      digits="$(($RANDOM % 100000 + 999999))"
+      passphrase="$(xkcdpass --case first | tr '\n' ' ' | awk "\$1 = toupper(\$1) { print \$1\"-\"\$2\"-\"\$3\"-\"\$4\"-${digits:0:6}\" }")"
+      #passphrase="$(xkcdpass --case first --numwords 4 | awk "\$1 = toupper(\$1) { print \$1\"-\"\$2\"-\"\$3\"-\"\$4\"-$(shuf -i 100000-999999 -n 1)\" }")"
+    fi
+
+    echo ""
+    echo "Secret name:	$filename"
+    echo "User:		$user"
+    echo "Passphrase:	$passphrase"
+
+    echo ""
+    echo -n 'Create login with these details? [YES|no|abort] '
+    read -r create_confirmed
+
+    case ${create_confirmed:0:1} in
+      a) exit 0 ;;
+      n) echo "" && continue ;;
+      *) template="login=$user:$passphrase" && break ;;
+    esac
+  done
+
+  printf '%s' "$template" | overtake add "$filepath" -
+
+  overtake show --copy "$filepath"
 }
 
 
-move() {
-:
-}
-
-
-SECRETS_DIR="$HOME/.password-store"
+OVERTAKE_VAULT_DIR="$HOME/.password-store"
 # Need to set initial ACTION:PATH for while loop
-selected_option="DIRECTORY:${SECRETS_DIR%/}"
+selected_option="DIRECTORY:${OVERTAKE_VAULT_DIR%/}"
 
 # Overtake likes to keep things synced, but the current circumstance, disable it until needed
 export OVERTAKE_SYNC_GIT=no
 
 # Pretty colors for fzf output
-blue=$'\e[0;34;40m'
-lime=$'\e[0;32;40m'
+blue=$'\e[0;34m'
+lime=$'\e[0;32m'
 end=$'\e[0m'
 
 # This is where it happens, each iteration the loop examines $selected_option
@@ -154,7 +194,7 @@ while true; do
 
   action="${selected_option%%:*}"
   item="${selected_option#$action:}"
-  name="${item#$SECRETS_DIR/}"
+  name="${item#$OVERTAKE_VAULT_DIR/}"
   name="${name%.gpg}"
 
   case $action in
@@ -171,7 +211,7 @@ while true; do
       if [ $? -eq 0 ]; then
         return_dir="${item%/*}"
       else
-        echo "Directory $item is not empty, force delete? [yes|NO]"
+        echo "Directory $item is not empty, delete it? [yes|NO]"
         read -r yn
         if [ "$yn" = "yes" ]; then
           rm -Rf "$item"
@@ -193,12 +233,38 @@ while true; do
       selected_option="SECRET:${item}"
     ;;
     SECRET_DELETE)
-      rm "$item"
+      secret="${item#$OVERTAKE_VAULT_DIR/}"
+      secret="${secret%.gpg}"
+      echo "Delete secret $secret? [yes|NO]"
+      read -r yn
+      [ "$yn" = "yes" ] && rm "$item"
       selected_option="DIRECTORY:${item%/*}"
     ;;
     MOVE)
-      move "$item"
+      # This is not a function because it needs to be able to prompt for user input
+
       selected_option="DIRECTORY:${item%/*}"
+
+      relative_path="${item%.gpg}"
+      relative_path="${relative_path#$OVERTAKE_VAULT_DIR/}"
+
+      read -e -p "New path: " -i "$relative_path" -r new_path
+
+      target_path="$OVERTAKE_VAULT_DIR/${new_path#/}"
+
+      [ -f "$item" ] && target_path="${target_path%.gpg}.gpg"
+
+      if [ -e "$target_path" ]; then
+        echo "Path $target_path already exists, overwrite it? [yes|NO]"
+        read -r yn
+        if [ "$yn" = "yes" ]; then
+          rm -Rf "$target_path"
+        else
+          continue
+        fi
+      fi
+
+      mv "$item" "$target_path"
     ;;
     SECRET_EDIT)
       overtake edit "$item"
@@ -211,7 +277,9 @@ while true; do
     *) echo "Unknown action $action, aborting.."; exit 1 ;;
   esac
 
-  echo $selected_option
+  #echo $selected_option
+
+  clear
 
   [ "$selected_option" = "" ] && break
 done

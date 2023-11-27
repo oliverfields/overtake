@@ -17,15 +17,15 @@
 
 # Define this function to use another editor than vi. It will be called in one of two contexts:
 #
-# 1. When adding a new file to the password store
-# 2. When editing an existing file in the password store
+# 1. When adding a new file to the vault
+# 2. When editing an existing file in the vault
 #
 # When adding a new file if a OVERTAKE_EXT_template function exists, it's output will be piped in, but if this function does not exist the function will be called without input to stdin. Therefore, it must handle being called in both these ways:
 #
 # 1. <command that pipes unencrypted data> | edit_then_encrypt $FILE -
 # 2. edit_then_encrypt $FILE
 #
-# The function needs to allow user to edit the plain text/decrypted content that is piped in. Content must be encrypted and written to $FILE in password_store. The FILE argument is an absolute path.
+# The function needs to allow user to edit the plain text/decrypted content that is piped in. Content must be encrypted and written to $FILE in .secrets. The FILE argument is an absolute path.
 #
 # Example code, that does write unencrypted content to disk!
 # edit_then_encrypt()
@@ -42,7 +42,7 @@
 #  nano "$tmp_file"
 #
 #  # Encrypt content back to the password-store
-#  gpg --recipient "$PASSWORD_STORE_DEFAULT_RECIPIENTS" --output "$FILE" --encrypt "$tmp_file"
+#  gpg --recipient "$OVERTAKE_DEFAULT_RECIPIENTS" --output "$FILE" --encrypt "$tmp_file"
 #
 #  # Tidy up
 #  rm "$tmp_file"

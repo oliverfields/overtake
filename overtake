@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Manage gpg encrypted files in pass .password-store type directory
+# Manage gpg encrypted files directory tree
 
 # Halt on error
 set -e
@@ -23,75 +23,51 @@ error()
 # Print help
 help()
 {
-  echo -e 'Manage directory of GPG encrypted files and optionally any git repositories in the password store directory.
+  echo -e 'Manage directory of GPG encrypted files and optionally any git repositories in the vault directory.
 
 The argument [file] is optional, if not specified a file selection dialogue will be opened.
 
 	\e[1madd\e[0m <file> [-|/dev/stdin]
-		Create new file in $PASSWORD_STORE_DIR, path must be relative (not start with /). If path contains directories, these will also be created. Specifying - or /dev/stdin will read contents of stdin into editor(vim) for editing and before encrypting
+		Create new file in $OVERTAKE_VAULT_DIR, path must be relative (not start with /). If path contains directories, these will also be created. Specifying - or /dev/stdin will read contents of stdin into editor(vim) for editing and before encrypting
 
 		\e[1mExamples\e[0m
 			$ overtake add gnupg.org/login
 
-			Creates $PASSWORD_STORE_DIR/gnupg.org directory if not already created, and login.gpg encrypted file
+			Creates $OVERTAKE_VAULT_DIR/gnupg.org directory if not already created, and login.gpg encrypted file
 
 			$ xkcdpass | overtake add login -
 
-			Pipes output of xkcdpass to editor, and on save writes encrypted content to $PASSWORD_STORE_DIR/login.gpg
+			Pipes output of xkcdpass to editor, and on save writes encrypted content to $OVERTAKE_VAULT_DIR/login.gpg
 
-	\e[1mcp\e[0m [--force|-f|--recursive|-r] <source path> <target path>
-		Copy files or directories
-
-		--force, -f
-			Overwrite target path even if it already exists
-
-		--recursive, -r
-			Copy directories recursively
-
-	\e[1mgit\e[0m [--commit-all|--pull-all]
+	\e[1mgit\e[0m [--commit-push-all|--pull-all]
 		Manually trigger git commands
 
-		--commit-all
-			Commit all changes to git repositories in password store
+		--commit-push-all
+			Commit all changes to git repositories in vault
 
 		--list-repositories
-			List git repositories in password store
+			List git repositories in vault
 
 		--pull-all
-			Manually trigger pulls on all git repositories in password store
+			Manually trigger pulls on all git repositories in vault
 
 	\e[1medit\e[0m [file]
 		Decrypt file, open in vi for editing and encrypt contents back to <file>
 
 	\e[1mlist\e[0m [--absolute|--pretty]
-		List .gpg files in $PASSWORD_STORE_DIR, defaults to tree view
+		List .gpg files in $OVERTAKE_VAULT_DIR, defaults to tree view
 
 		--absoulte
 			Lists full paths
 
 		--pretty
-			Lists password store relative and pretty paths
-
-	\e[1mmv\e[0m [--force|-f] <source path> <target path>
-		Move files or directories
-
-		--force, -f
-			Overwrite target path even if it already exists
+			Lists vault relative and pretty paths
 
 	\e[1mrecipients\e[0m [--sync]
-		List recipients for password store .gpg files. Recipients space separated and set in .gpg-id files, in config using setting recipients or by environment variable OVERTAKE_RECIPIENTS
+		List recipients for vault .gpg files. Recipients space separated and set in .gpg-id files, in config using setting recipients or by environment variable OVERTAKE_RECIPIENTS
 
 		--sync
 			Update recipients to match those specified. If new gpg key, a sync must be run
-
-	\e[1mrm\e[0m [--force|-f|--recursive|-r] <path>
-		Remove/delete files or directories
-
-		--force, -f
-			Remove/delete path even if it already exists
-
-		--recursive, -r
-			Remove/delete directories recursively
 
 	\e[1mshow\e[0m <-copy|-c|--no-clear|-n> <file>
 		Default select file from list and print decrypted contents to terminal
@@ -114,19 +90,17 @@ usage()
 {
   echo -e "Usage: overtake 
 	add <file> [-|/dev/stdin]
-	cr [--force|--recursive] <source file> <target file>
 	edit [file]
-	git [--commit-all|--list-repositories|--pull-all]
+	git [--commit-push-all|--list-repositories|--pull-all]
 	help
 	list [--absolute|--pretty]
-	mv [--force] <source file> <target file>
-	recipients [--sync]|show [-copy|--no-clear] [file]
-	rm [--force|--recursive] [file]"
+	recipients [--sync]
+    show [-copy|--no-clear] [file]"
   exit 1
 }
 
 
-# For all git repositories in password store, run batch commands
+# For all git repositories in vault, run batch commands
 batch_repos_cmd()
 {
   if [ "$OVERTAKE_SYNC_GIT" != "yes" ]; then
@@ -145,8 +119,8 @@ batch_repos_cmd()
   fi
 
 
-  # Find all git repos in password store
-  for repo in $(find "$PASSWORD_STORE_DIR" -type d -name '.git'); do
+  # Find all git repos in vault
+  for repo in $(find "$OVERTAKE_VAULT_DIR" -type d -name '.git'); do
 
     git_dir="${repo%/*}"
 
@@ -190,14 +164,14 @@ absolute_file_path()
 
   # If file path does not start with a / it is relative and needs making absolute
   if [[ "$file_path" != /* ]]; then
-    file_path="$PASSWORD_STORE_DIR/$file_path"
+    file_path="$OVERTAKE_VAULT_DIR/$file_path"
   fi
 
   echo "$file_path"
 }
 
 
-# Return file path relative to password store dir for a file
+# Return file path relative to vault dir for a file
 relative_file_path()
 {
   file_path="$1"
@@ -205,22 +179,22 @@ relative_file_path()
   file_path="${file_path%.gpg}.gpg"
 
   # Strip password dir
-  file_path="${file_path#"$PASSWORD_STORE_DIR"/}"
+  file_path="${file_path#"$OVERTAKE_VAULT_DIR"/}"
 
   echo "$file_path"
 }
 
 
-# List all gpg files in password store
+# List all gpg files in vault
 list_pretty_paths()
 {
-  list_absolute_paths | sed 's#^'$PASSWORD_STORE_DIR'/## ; s/\.gpg$//'
+  list_absolute_paths | sed 's#^'$OVERTAKE_VAULT_DIR'/## ; s/\.gpg$//'
 }
 
 
 list_absolute_paths()
 {
-  find "$PASSWORD_STORE_DIR" -type f -name '*.gpg'
+  find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg'
 }
 
 
@@ -228,7 +202,7 @@ list_absolute_paths()
 list_tree()
 {
   if command -v tree &> /dev/null; then
-    tree --noreport --dirsfirst "$PASSWORD_STORE_DIR" | sed 's/\.gpg$//'
+    tree --noreport --dirsfirst "$OVERTAKE_VAULT_DIR" | sed 's/\.gpg$//'
   else
     echo "Warning: Command tree not found so doing a plain list instead" > /dev/stderr
     list_pretty_paths
@@ -238,7 +212,7 @@ list_tree()
 
 list_git_repos()
 {
-  for repo in $(find "$PASSWORD_STORE_DIR" -type d -name '.git'); do
+  for repo in $(find "$OVERTAKE_VAULT_DIR" -type d -name '.git'); do
     cd "${repo%/.git}"
     echo "$PWD/.git $(git ls-remote --get-url origin)"
   done | sort
@@ -253,7 +227,7 @@ sync_recipients()
 
   trap "rm -f '$tmp_file'" EXIT
 
-  for file in $(find "$PASSWORD_STORE_DIR" -type f -name '*.gpg'); do
+  for file in $(find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg'); do
     recipients="$(get_configured_recipients "$file")"
     recipients="--recipient ${recipients// / --recipient }"
 
@@ -268,14 +242,14 @@ sync_recipients()
 list_recipients()
 {
 
-  for file in $(find "$PASSWORD_STORE_DIR" -type f -name '*.gpg' | sort); do
+  for file in $(find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg' | sort); do
     actual_recipients="$(get_gpg_file_recipients "$file")"
     configured_recipients="$(get_configured_recipients "$file")"
 
     [ "$actual_recipients" = "" ] && error "No recipients found in $file"
     [ "$configured_recipients" = "" ] && error "No recipients configured for $file"
 
-    file_name="${file#$PASSWORD_STORE_DIR/}"
+    file_name="${file#$OVERTAKE_VAULT_DIR/}"
     file_name="${file_name%.gpg}"
 
     # Checking actual and configured are the same depends on both functions return recipients alphabetically sorted
@@ -307,7 +281,7 @@ get_gpg_file_recipients()
 }
 
 
-# Get all configured recipients from .gpg-id files, $OVERTAKE_RECIPIENTS and $PASSWORD_STORE_KEY
+# Get all configured recipients from .gpg-id files, $OVERTAKE_RECIPIENTS
 # Veryfi have gpg key available for each recipient
 get_configured_recipients()
 {
@@ -317,8 +291,8 @@ get_configured_recipients()
 
   cd "$dir_path"
 
-  # Go up directory tree until find a valid .gpg-id file, quit if we gone passed the password store
-  while [ "$PWD" != "${PASSWORD_STORE_DIR%/*}" ]; do
+  # Go up directory tree until find a valid .gpg-id file, quit if we gone passed the vault
+  while [ "$PWD" != "${OVERTAKE_VAULT_DIR%/*}" ]; do
     if [ -f "$PWD/.gpg-id" ]; then
       gpg_id_file="$PWD/.gpg-id"
       break
@@ -331,13 +305,13 @@ get_configured_recipients()
   fi
 
   # Add recipients from settings also
-  recipients_string="$OVERTAKE_RECIPIENTS $PASSWORD_STORE_KEY $recipients_string"
+  recipients_string="$OVERTAKE_RECIPIENTS $recipients_string"
   recipients_string="${recipients_string/  / }"
 
   # Need to tidy up, remove any duplicates and verify that have recipient keys
   recipients_tmp_array=( $recipients_string )
 
-  [ ${#recipients_tmp_array[@]} -eq 0 ] && error "No gpg recipients defined in PASSWORD_STORE_DIR_DEFAULT_RECIPIENTS, .gpg-id files or PASSWORD_STORE_KEY"
+  [ ${#recipients_tmp_array[@]} -eq 0 ] && error "No gpg recipients defined in OVERTAKE_DEFAULT_RECIPIENTS or .gpg-id files"
 
   # Use associative array to weed out duplicates
   declare -A recipients
@@ -373,7 +347,7 @@ get_configured_recipients()
 # Try to add new encrypted file with newly generated passphrase, update git if applicable
 add()
 {
-  # If path contains PASSWORD_STORE_DIR, remove it, so we can handle both relative and absolute paths
+  # If path contains OVERTAKE_VAULT_DIR, remove it, so we can handle both relative and absolute paths
   file="$1"
   pipe_input="$2"
 
@@ -439,7 +413,7 @@ get_file_path()
   file="$1"
 
   if [ "$2" = "" ]; then
-    prompt="Password store $PASSWORD_STORE_DIR using key $OVERTAKE_RECIPIENTS"
+    prompt="vault $OVERTAKE_VAULT_DIR using key $OVERTAKE_RECIPIENTS"
   else
     prompt="$2"
   fi
@@ -555,7 +529,7 @@ if [ -e "$config_file" ]; then
     line="${line/\$HOME/$HOME}"
 
     case $line in
-      password_store_dir=*) [ -z "$PASSWORD_STORE_DIR" ] && PASSWORD_STORE_DIR="${line#password_store_dir=}" ;;
+      vault_dir=*) [ -z "$OVERTAKE_VAULT_DIR" ] && OVERTAKE_VAULT_DIR="${line#vault_dir=}" ;;
       recipients=*) [ -z "$OVERTAKE_RECIPIENTS" ] && OVERTAKE_RECIPIENTS="${line#recipients=}" ;;
       sync_git=*) [ -z "$OVERTAKE_SYNC_GIT" ] && OVERTAKE_SYNC_GIT="${line#sync_git=}" ;;
       vimrc_overtake=*) [ -z "$OVERTAKE_VIMRC" ] && OVERTAKE_VIMRC="${line#vimrc_overtake=}" ;;
@@ -568,7 +542,7 @@ if [ -e "$config_file" ]; then
 fi
 
 # Set defaults if no environment variables found or values not set in config file
-[ -z "$PASSWORD_STORE_DIR" ] && PASSWORD_STORE_DIR="$HOME/.password-store"
+[ -z "$OVERTAKE_VAULT_DIR" ] && OVERTAKE_VAULT_DIR="$HOME/.secrets"
 [ -z "$OVERTAKE_RECIPIENTS" ] && OVERTAKE_RECIPIENTS="your@gpg.key"
 [ -z "$OVERTAKE_SYNC_GIT" ] && OVERTAKE_SYNC_GIT="no"
 [ -z "$OVERTAKE_VIMRC" ] && OVERTAKE_VIMRC="$OVERTAKE_DIR/vimrc_overtake"
@@ -578,9 +552,9 @@ fi
 [ -e "$OVERTAKE_EXTENSIONS" ] && source "$OVERTAKE_EXTENSIONS"
 
 # Remove any trailing slash
-PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR%/}"
+OVERTAKE_VAULT_DIR="${OVERTAKE_VAULT_DIR%/}"
 
-[ -d "$PASSWORD_STORE_DIR" ] || error "No directory at $PASSWORD_STORE_DIR"
+[ -d "$OVERTAKE_VAULT_DIR" ] || error "No directory at $OVERTAKE_VAULT_DIR"
 
 # Set mode
 if [ $# -eq 0 ]; then
@@ -662,7 +636,7 @@ case $mode in
 
   ;;
   git)
-    if [ "$2" = "--pull-all" ] || [ "$2" = "--commit-all" ]; then
+    if [ "$2" = "--pull-all" ] || [ "$2" = "--commit-push-all" ]; then
       # Actions are called before and after this case, so our work here is already done
       :
     elif [ "$2" = "--list-repositories" ]; then
@@ -670,15 +644,6 @@ case $mode in
     else
       usage
     fi
-  ;;
-  cp)
-    echo IMPLEMENT ME
-  ;;
-  mv)
-    echo IMPLEMENT ME
-  ;;
-  rm)
-    echo IMPLEMENT ME
   ;;
   help)
     help

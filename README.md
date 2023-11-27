@@ -16,7 +16,7 @@ Overtake is a CLI client for managing gpg encrypted files in a directory hiearch
 1. Either `git clone` or download from github. This guide assumes overtake is located at `~/.local/overtake`
 2. Create password store directory `mkdir ~/.password-store`, if you already have this and use it with `pass`, it will work just fine
 3. Create config file `cp ~/.local/overtake/overtake.conf .config/overtake.conf`
-4. Edit `overtake.conf` so **PASSWORD_STORE_DEFAULT_RECIPIENTS** matches your GPG Key ID, you can add multiple recipients by separating them with a space. See [Creating a GPG key](#creating-a-gpg-key) if you do not already have one
+4. Edit `overtake.conf` so **OVERTAKE_DEFAULT_RECIPIENTS** matches your GPG Key ID, you can add multiple recipients by separating them with a space. See [Creating a GPG key](#creating-a-gpg-key) if you do not already have one
 5. If you want bash completion typically symlink to wherever your distro looks for bash completion scripts e.g. `ln -s ~/.local/overtake/overtake_completion /etc/bash_completion.d/overtake_completion`. Or, maybe source it in a startup script `echo '. ~/.local/overtake/overtake_completion' >> ~/.profile`
 
 Some commands to try.
@@ -40,15 +40,15 @@ Under the hood overtake uses gpg to encrypt and decrypt files. When encrypting i
 
 GPG recipients can be spesified in the following ways.
 
-* Space separated list either set by environment variable or in `overtake.conf` setting named **PASSWORD_STORE_DEFAULT_RECIPIENTS**, these recipients will be applied to all keys in password store. To be compatible with **pass**, environment variable or config setting **PASSWORD_STORE_KEY** can also be used in the same way
-* Specified one recipients per line in `.gpg-id`. These files can be set anywhere in the password store, and the recipients are applied in addition to **PASSWORD_STORE_DEFAULT_RECIPIENTS** and **PASSWORD_STORE_KEY**, for all keys in the current directory and below. If a new `.gpg-key` file is found, its recipients will be used instead
+* Space separated list either set by environment variable or in `overtake.conf` setting named **OVERTAKE_VAULT_DEFAULT_RECIPIENTS**, these recipients will be applied to all keys in password store. To be compatible with **pass**, environment variable or config setting **OVERTAKE_VAULT_KEY** can also be used in the same way
+* Specified one recipients per line in `.gpg-id`. These files can be set anywhere in the password store, and the recipients are applied in addition to **OVERTAKE_VAULT_DEFAULT_RECIPIENTS** and **OVERTAKE_VAULT_KEY**, for all keys in the current directory and below. If a new `.gpg-key` file is found, its recipients will be used instead
 
 Consider this example using the following setup:
 
-The setting `PASSWORD_STORE_DEFAULT_RECIPIENTS=me@my.tld` is set in `overtake.conf` and the password store directory is set up as follows.
+The setting `OVERTAKE_DEFAULT_RECIPIENTS=me@my.tld` is set in `overtake.conf` and the vault directory is set up as follows.
 
 ```
-~/password-store
+~/.secrets
 ├── personal
 │   └── github-user.gpg
 └── team
@@ -71,7 +71,7 @@ In this case `github-user.gpg` will be decryptable by gpg public key **me@my.tld
 Overtake tries to make git integration work seamlessly behind the scenes. Setup git syncing as follows.
 
 1. Edit `overtake.conf` and uncommment/add `GIT_SYNC=yes`
-2. Make sure `~/.password-store` is a git repositorye, e.g. `git init`, or `git clone` it from somewhere
+2. Make sure `~/.secrets` is a git repositorye, e.g. `git init`, or `git clone` it from somewhere
 
 Now any add, edit or delete will update the file and do git add & commit the change. If the git repository has a remote a `git pull` will be run prior to file update, and finally `git push` will sync changes back to remote repo.
 
