@@ -88,7 +88,7 @@ The argument [file] is optional, if not specified a file selection dialogue will
 # Print usage message
 usage()
 {
-  echo -e "Usage: overtake 
+  echo -e "Usage: overtake [file]
 	add <file> [-|/dev/stdin]
 	edit [file]
 	git [--commit-push-all|--list-repositories|--pull-all]
@@ -490,20 +490,6 @@ show()
 }
 
 
-# Delete key
-delete()
-{
-  file="$(get_file_path "$1")"
-
-  # No file selected
-  [ "$file" = "" ] && exit 0
-
-  [ -e "$file" ] || error "File $file does not exist"
-
-  rm "$file"
-}
-
-
 gpg_decrypt_file()
 {
   file="$1"
@@ -649,7 +635,16 @@ case $mode in
     help
   ;;
   *)
-    usage
+    if [ $# -eq 1 ]; then
+      path="$(absolute_file_path "$1")"
+      if [ -f "$path" ]; then
+        show "$path"
+      else
+        usage
+      fi
+    else
+      usage
+    fi
   ;;
 esac
 
