@@ -139,19 +139,19 @@ batch_repos_cmd()
     case $batch_cmd in
       pull)
         if [ "$has_remote" = "yes" ]; then
-          echo "Git pull $git_dir"
+          #echo "Git pull $git_dir"
           git pull --quiet || error "Unable to pull repo $repo remote"
         fi
       ;;
       commitall)
         # Check if changes, if so commit and push
         if [ -n "$(git status --porcelain)" ]; then
-          echo "Git commit on $git_dir"
+          #echo "Git commit on $git_dir"
           git add --all || error "Git add failed on repo $repo"
           git commit -m 'Overtake sync' --quiet || error "Git commit failed on repo $repo"
 
           if [ "$has_remote" = "yes" ]; then
-            echo "Git push on $git_dir"
+            #echo "Git push on $git_dir"
             git push --quiet || error "Unable to push to remote git repo $repo"
           fi
         fi
