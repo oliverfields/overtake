@@ -173,10 +173,27 @@ create_secret() {
   overtake show --copy "$filepath"
 }
 
+# Get vault dir
 
-OVERTAKE_VAULT_DIR="$HOME/.password-store"
+if [ -z "$OVERTAKE_VAULT_DIR" ]; then
+  OVERTAKE_VAULT_DIR="$(grep '^vault_dir=' "$HOME/.config/overtake.conf")"
+  OVERTAKE_VAULT_DIR="${OVERTAKE_VAULT_DIR#vault_dir=}"
+  OVERTAKE_VAULT_DIR="${OVERTAKE_VAULT_DIR/\~/$HOME}"
+  OVERTAKE_VAULT_DIR="${OVERTAKE_VAULT_DIR/\$HOME/$HOME}"
+
+  [ "$OVERTAKE_VAULT_DIR" = "" ] && OVERTAKE_VAULT_DIR="$HOME/.secrets"
+fi
+
 # Need to set initial ACTION:PATH for while loop
 selected_option="DIRECTORY:${OVERTAKE_VAULT_DIR%/}"
+
+# If git sync, then try a pull before we start
+if grep '^sync_git=yes$' "$HOME/.config/overtake.conf" > /dev/null; then
+  overtake_sync_git_config_setting=yes
+  overtake git --pull-all
+else
+  overtake_sync_git_config_setting=no
+fi
 
 # Overtake likes to keep things synced, but the current circumstance, disable it until needed
 export OVERTAKE_SYNC_GIT=no
@@ -278,9 +295,11 @@ while true; do
   esac
 
   #echo $selected_option
-
   clear
 
   [ "$selected_option" = "" ] && break
 done
+
+# Sync git, if applicable
+[ "$overtake_sync_git_config_setting" = "yes" ] && overtake git --commit-push-all
 

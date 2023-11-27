@@ -103,8 +103,11 @@ usage()
 # For all git repositories in vault, run batch commands
 batch_repos_cmd()
 {
-  if [ "$OVERTAKE_SYNC_GIT" != "yes" ]; then
-    return
+  # If git mode we want to git, so only honor sync git setting if another mode
+  if [ "$mode" != "git" ]; then
+    if [ "$OVERTAKE_SYNC_GIT" != "yes" ]; then
+      return
+    fi
   fi
 
   if ! command -v git &> /dev/null; then
@@ -122,6 +125,7 @@ batch_repos_cmd()
   # Find all git repos in vault
   for repo in $(find "$OVERTAKE_VAULT_DIR" -type d -name '.git'); do
 
+
     git_dir="${repo%/*}"
 
     cd "$git_dir" || error "Unable to cd to $git_dir"
@@ -135,16 +139,19 @@ batch_repos_cmd()
     case $batch_cmd in
       pull)
         if [ "$has_remote" = "yes" ]; then
+          echo "Git pull $git_dir"
           git pull --quiet || error "Unable to pull repo $repo remote"
         fi
       ;;
       commitall)
         # Check if changes, if so commit and push
         if [ -n "$(git status --porcelain)" ]; then
+          echo "Git commit on $git_dir"
           git add --all || error "Git add failed on repo $repo"
           git commit -m 'Overtake sync' --quiet || error "Git commit failed on repo $repo"
 
           if [ "$has_remote" = "yes" ]; then
+            echo "Git push on $git_dir"
             git push --quiet || error "Unable to push to remote git repo $repo"
           fi
         fi
@@ -497,6 +504,7 @@ gpg_decrypt_file()
   gpg --quiet --decrypt "$file" || error "Unable to decrypt $file, perhaps key passphrase is not cached by gpg-agent yet?"
 }
 
+
 # Thanks MrYellow https://unix.stackexchange.com/a/721679
 OVERTAKE_DIR=$( cd -- "$( dirname -- "$(readlink -f "${BASH_SOURCE[0]}" || ${BASH_SOURCE[0]})" )" &> /dev/null && pwd )
 
@@ -551,12 +559,8 @@ fi
 
 # When to do git pull
 case $mode in
-  help)
+  help|git)
     : # Do nothing
-  ;;
-  git)
-    # If we are using git mode, we are of course syncing
-    OVERTAKE_SYNC_GIT=yes batch_repos_cmd pull
   ;;
   *)
     batch_repos_cmd pull
@@ -622,14 +626,18 @@ case $mode in
 
   ;;
   git)
-    if [ "$2" = "--pull-all" ] || [ "$2" = "--commit-push-all" ]; then
-      # Actions are called before and after this case, so our work here is already done
-      :
-    elif [ "$2" = "--list-repositories" ]; then
-      list_git_repos
-    else
-      usage
-    fi
+    case $# in
+      1) list_git_repos ;;
+      2)
+        case $2 in
+          --pull-all) batch_repos_cmd pull ;;
+          --commit-push-all) batch_repos_cmd commitall ;;
+          --list-repositories) list_git_repos ;;
+          *) usage ;;
+        esac
+      ;;
+      *) usage ;;
+    esac
   ;;
   help)
     help
@@ -651,12 +659,8 @@ esac
 
 # When to do git commit
 case $mode in
-  help|list|show|copy)
+  git|help|list|show|copy)
     : # Do nothing
-  ;;
-  git)
-    # If we are using git mode, we are of course syncing
-    OVERTAKE_SYNC_GIT=yes batch_repos_cmd commitall
   ;;
   *)
     batch_repos_cmd commitall
