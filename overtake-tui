@@ -172,9 +172,7 @@ create_secret() {
     esac
   done
 
-  printf '%s' "$template" | overtake add "$filepath" -
-
-  overtake show --copy "$filepath"
+  printf '%s' "$template"
 }
 
 # Get vault dir
@@ -211,6 +209,7 @@ end=$'\e[0m'
 # $selected_option is in format ACTION:PATH
 # Action decides what happens to PATH
 # Each action must set $selected_option to a new ACTION:PATH, or break the loop
+# Several of the actions below that ask user for input are not made into functions, as that seems to break things
 while true; do
 
   action="${selected_option%%:*}"
@@ -226,7 +225,6 @@ while true; do
       selected_option="DIRECTORY:$item"
     ;;
     DIRECTORY_DELETE)
-      # This is not a function because it needs to be able to prompt for user input
 
       rmdir "$item" &> /dev/null
       if [ $? -eq 0 ]; then
@@ -244,7 +242,70 @@ while true; do
       selected_option="DIRECTORY:$return_dir"
     ;;
     SECRET_NEW)
-      create_secret "$item"
+      while true; do
+
+        if [ "$item" = "$OVERTAKE_VAULT_DIR" ]; then
+          display_path=""
+        else
+          display_path="${item#$OVERTAKE_VAULT_DIR/}/"
+        fi
+
+        read -e -p 'New secret name: ' -i "$display_path" -r filename
+
+        filepath="${OVERTAKE_VAULT_DIR%/}/${filename%.gpg}.gpg"
+
+        if [ -e "$filepath" ]; then
+          echo "Secret $filename already exists, retry? [YES|no]"
+          read -r yn
+          [ "$yn" = "no" ] && exit
+          continue
+        fi
+
+        echo 'Use template for username and passphrase? [YES|no] '
+        read -r create_username_passphrase
+
+        # Want to edit file manually from just set empty template
+        if [ "${create_username_passphrase:0:1}" = "n" ]; then
+          secret=''
+          break
+        fi
+
+        echo -n 'User: '
+        read -r user
+
+        echo -n 'Passphrase (empty to generate one): '
+        read -r passphrase
+
+        if [ "$passphrase" = "" ]; then
+          gobbeldygook="$(pwgen -cnyB1s)"
+          passphrase="$(xkcdpass --case first | tr '\n' ' ' | awk "\$1 = toupper(\$1) { print \$1\"-\"\$2\"-\"\$3\"-\"\$4\"-$gobbeldygook\" }")"
+        fi
+
+        echo ""
+        echo "Secret name:	$filename"
+        echo "User:		$user"
+        echo "Passphrase:	$passphrase"
+
+        echo ""
+        echo -n 'Create login with these details? [YES|no|abort] '
+        read -r create_confirmed
+
+        case ${create_confirmed:0:1} in
+          a) break ;;
+          n) echo "" && continue ;;
+          *) secret="login=$user:$passphrase" && break ;;
+        esac
+      done
+
+
+      if [ "$secret" = "" ]; then
+        overtake add "$filepath"
+      else
+        printf '%s' "$secret" | overtake add "$filepath" -
+      fi
+
+      overtake show --copy "$filepath"
+
       selected_option="DIRECTORY:$item"
     ;;
     SECRET) selected_option="$(select_secret_option "$item")" ;;

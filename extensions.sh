@@ -8,9 +8,17 @@
 #}
 
 
-# Template to prepopulate new files with functions output, when using overtake add <file>
+# Template to prepopulate new files with functions output, when using overtake add
+# Uncomment only one of the lines in the function body below
 #OVERTAKE_EXT_template()
 #{
+#  # Use pwgen
+#  pwgen -cnyB1s
+#
+#  # Use xkcdpass
+#  xkcdpass
+#
+#  # Use "random" number
 #  echo "username=\npassword=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 13)"
 #}
 
