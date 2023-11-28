@@ -119,8 +119,13 @@ create_secret() {
 
   while true; do
 
-    echo -n 'New secret name: '
-    read -r filename
+    if [ "$parent_dir" = "$OVERTAKE_VAULT_DIR" ]; then
+      display_path=""
+    else
+      display_path="${parent_dir#$OVERTAKE_VAULT_DIR/}/"
+    fi
+
+    read -e -p 'New secret name: ' -i "$display_path" -r filename
 
     filepath="${OVERTAKE_VAULT_DIR%/}/${filename%.gpg}.gpg"
 
@@ -131,14 +136,14 @@ create_secret() {
       continue
     fi
 
-    #echo -n 'Use template for username and passphrase? [YES|no] '
-    #read -r create_username_passphrase
+    echo 'Use template for username and passphrase? [YES|no] '
+    read -r create_username_passphrase
 
     # Want to edit file manually from just set empty template
-    #if [ "${create_username_passphrase:0:1}" = "n" ]; then
-    #  template=''
-    #  break
-    #fi
+    if [ "${create_username_passphrase:0:1}" = "n" ]; then
+      template=''
+      break
+    fi
 
     echo -n 'User: '
     read -r user
@@ -147,9 +152,8 @@ create_secret() {
     read -r passphrase
 
     if [ "$passphrase" = "" ]; then
-      digits="$(($RANDOM % 100000 + 999999))"
-      passphrase="$(xkcdpass --case first | tr '\n' ' ' | awk "\$1 = toupper(\$1) { print \$1\"-\"\$2\"-\"\$3\"-\"\$4\"-${digits:0:6}\" }")"
-      #passphrase="$(xkcdpass --case first --numwords 4 | awk "\$1 = toupper(\$1) { print \$1\"-\"\$2\"-\"\$3\"-\"\$4\"-$(shuf -i 100000-999999 -n 1)\" }")"
+      gobbeldygook="$(pwgen -cnyB1s)"
+      passphrase="$(xkcdpass --case first | tr '\n' ' ' | awk "\$1 = toupper(\$1) { print \$1\"-\"\$2\"-\"\$3\"-\"\$4\"-$gobbeldygook\" }")"
     fi
 
     echo ""
@@ -162,7 +166,7 @@ create_secret() {
     read -r create_confirmed
 
     case ${create_confirmed:0:1} in
-      a) exit 0 ;;
+      a) clear; exit 0 ;;
       n) echo "" && continue ;;
       *) template="login=$user:$passphrase" && break ;;
     esac
