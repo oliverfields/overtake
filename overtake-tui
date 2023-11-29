@@ -230,7 +230,7 @@ while true; do
       if [ $? -eq 0 ]; then
         return_dir="${item%/*}"
       else
-        echo "Directory $item is not empty, delete it? [yes|NO]"
+        echo "Directory ${item#$OVERTAKE_VAULT_DIR/} is not empty, delete it? [yes|NO]"
         read -r yn
         if [ "$yn" = "yes" ]; then
           rm -Rf "$item"

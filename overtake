@@ -39,6 +39,9 @@ The argument [file] is optional, if not specified a file selection dialogue will
 
 			Pipes output of xkcdpass to editor, and on save writes encrypted content to $OVERTAKE_VAULT_DIR/login.gpg
 
+	\e[1medit\e[0m [file]
+		Decrypt file, open in vim for editing and encrypt contents back to <file>, decrypted exists only in memory, it is not written to disk
+
 	\e[1mgit\e[0m [--commit-push-all|--pull-all]
 		Manually trigger git commands
 
@@ -50,9 +53,6 @@ The argument [file] is optional, if not specified a file selection dialogue will
 
 		--pull-all
 			Manually trigger pulls on all git repositories in vault
-
-	\e[1medit\e[0m [file]
-		Decrypt file, open in vi for editing and encrypt contents back to <file>
 
 	\e[1mlist\e[0m [--absolute|--pretty]
 		List .gpg files in $OVERTAKE_VAULT_DIR, defaults to tree view
@@ -121,6 +121,7 @@ batch_repos_cmd()
     error "No valid batch command supplied for batch_command_repos $batch_cmd"
   fi
 
+  echo -n "Syncing vault.."
 
   # Find all git repos in vault
   for repo in $(find "$OVERTAKE_VAULT_DIR" -type d -name '.git'); do
@@ -139,25 +140,28 @@ batch_repos_cmd()
     case $batch_cmd in
       pull)
         if [ "$has_remote" = "yes" ]; then
-          echo "Git pull $git_dir"
+          #echo "Checking for updates to $git_dir.."
           git pull --quiet || error "Unable to pull repo $repo remote"
         fi
       ;;
       commitall)
         # Check if changes, if so commit and push
         if [ -n "$(git status --porcelain)" ]; then
-          echo "Git commit on $git_dir"
-          git add --all || error "Git add failed on repo $repo"
+          #echo "Modifications found in $git_dir.."
+          git add -A || error "Git add failed on repo $repo"
           git commit -m 'Overtake sync' --quiet || error "Git commit failed on repo $repo"
 
           if [ "$has_remote" = "yes" ]; then
-            echo "Git push on $git_dir"
+            #echo "Uploading changes to $git_dir.."
             git push --quiet || error "Unable to push to remote git repo $repo"
           fi
         fi
       ;;
     esac
   done
+
+  echo " done"
+  clear
 }
 
 
@@ -174,7 +178,7 @@ absolute_file_path()
     file_path="$OVERTAKE_VAULT_DIR/$file_path"
   fi
 
-  echo "$file_path"
+  echo -n "$file_path"
 }
 
 
@@ -188,7 +192,7 @@ relative_file_path()
   # Strip password dir
   file_path="${file_path#"$OVERTAKE_VAULT_DIR"/}"
 
-  echo "$file_path"
+  echo -n "$file_path"
 }
 
 
@@ -441,7 +445,7 @@ get_file_path()
 
   [ -f "$file_path_absolute" ] || error "Path $file not found"
 
-  echo "$file_path_absolute"
+  echo -n "$file_path_absolute"
 }
 
 
@@ -493,9 +497,9 @@ show()
     # If config file has defined a function for clipboard, use it to copy
     if [[ $(type -t OVERTAKE_EXT_clipboard) == function ]]; then
       print_decrypted_content "$file" | OVERTAKE_EXT_clipboard
-    # Else emulate pass behaviour by just copying 1st line to clipboard
+    # Else just copy secret to clipboard
     else
-      print_decrypted_content "$file" | head -n1 | tr -d '\n' | xsel --clipboard
+      print_decrypted_content "$file" | xsel --clipboard
     fi 
   else
     usage
