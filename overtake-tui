@@ -350,7 +350,7 @@ while true; do
     ;;
     SECRET_EDIT)
       overtake edit "$item"
-      selected_option="DIRECTORY:$item"
+      selected_option="SECRET:$item"
     ;;
     SECRET_SHOW)
       overtake show "$item"
