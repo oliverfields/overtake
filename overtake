@@ -161,7 +161,6 @@ batch_repos_cmd()
   done
 
   echo " done"
-  clear
 }
 
 
