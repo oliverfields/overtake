@@ -23,7 +23,7 @@ error()
 # Print help
 help()
 {
-  echo -e 'Manage directory of GPG encrypted files and optionally any git repositories in the vault directory.
+  echo -e 'Manage vault of secrets. The vault is directory of GPG encrypted secrets. The vault can sync one or more git directories.
 
 The argument [file] is optional, if not specified a file selection dialogue will be opened.
 
