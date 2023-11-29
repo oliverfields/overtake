@@ -409,6 +409,10 @@ edit_then_encrypt()
   if [ "$stdin_arg" = "-" ]; then
     readarray -u 0 stdin
 
+    # Add new line to end of stdin
+    stdin+=("
+")
+
     printf "%s" "${stdin[@]}" | GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_VIMRC" -
   else
     GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_VIMRC"
