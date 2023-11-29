@@ -407,7 +407,9 @@ edit_then_encrypt()
   stdin_arg="$3"
 
   if [ "$stdin_arg" = "-" ]; then
-    GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_VIMRC" - < /dev/stdin
+    readarray -u 0 stdin
+
+    printf "%s" "${stdin[@]}" | GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_VIMRC" -
   else
     GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_VIMRC"
   fi
@@ -559,12 +561,8 @@ fi
 
 # When to do git pull
 case $mode in
-  help|git)
-    : # Do nothing
-  ;;
-  *)
-    batch_repos_cmd pull
-  ;;
+  help|git) : ;; # Do nothing
+  *) batch_repos_cmd pull ;;
 esac
 
 
@@ -659,10 +657,6 @@ esac
 
 # When to do git commit
 case $mode in
-  git|help|list|show|copy)
-    : # Do nothing
-  ;;
-  *)
-    batch_repos_cmd commitall
-  ;;
+  git|help|list|show|copy) : ;; # Do nothing
+  *) batch_repos_cmd commitall ;;
 esac
