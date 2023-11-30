@@ -37,6 +37,9 @@ if has("+undofile")
   set undofile=
 endif
 
+" Make arrow keys behave
+set nocompatible
+
 " Warn user about saving to disk, and prompt for confirmation
 " TODO make this throw a bit nicer, but for now it works, just fugly
 autocmd BufWritePre * if ConfirmWrite() > 1 | throw "Write aborted" | endif
