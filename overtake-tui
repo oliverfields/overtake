@@ -252,7 +252,7 @@ while true; do
     SECRET_COPY)
       overtake show --copy "$item" > /dev/null
       read -p "Copied $name secret to clipboard, press Enter to continue.." -r x
-      selected_option="SECRET:${item}"
+      selected_option="SECRET:$item"
     ;;
     SECRET_DELETE)
       secret="${item#$OVERTAKE_VAULT_DIR/}"
@@ -294,7 +294,7 @@ while true; do
     ;;
     SECRET_SHOW)
       overtake show "$item"
-      selected_option="DIRECTORY:$item"
+      selected_option="SECRET:$item"
     ;;
     *) echo "Unknown action $action, aborting.."; exit 1 ;;
   esac
