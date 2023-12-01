@@ -121,7 +121,7 @@ batch_repos_cmd()
     error "No valid batch command supplied for batch_command_repos $batch_cmd"
   fi
 
-  echo -n "Syncing vault.."
+  #echo -n "Syncing vault.."
 
   # Find all git repos in vault
   for repo in $(find "$OVERTAKE_VAULT_DIR" -type d -name '.git'); do
@@ -160,8 +160,7 @@ batch_repos_cmd()
     esac
   done
 
-  echo " done"
-  clear
+  #echo " done"
 }
 
 

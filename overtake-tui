@@ -300,7 +300,6 @@ while true; do
   esac
 
   #echo $selected_option
-  clear
 
   [ "$selected_option" = "" ] && break
 done
