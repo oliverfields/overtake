@@ -13,16 +13,19 @@ _overtake_complete_entries ()
 
   for item in "${items[@]}"; do
 
-    local name="${item#$prefix}"
-    name="${name%.gpg}"
+    local item_name="${item#$prefix}"
+    item_name="${item_name%.gpg}"
+
+    # Remove path, so left with just directory or file name
+    name="${item_name##*/}"
 
     # Skip hidden files
     [ "${name:0:1}" = "." ] && continue
 
     if [ -d "$item" ]; then
-      COMPREPLY+=("$name/")
+      COMPREPLY+=("$item_name/")
     else
-      COMPREPLY+=("$name")
+      COMPREPLY+=("$item_name")
     fi
   done
 
