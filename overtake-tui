@@ -102,12 +102,11 @@ create_directories() {
     relative_directory_path=""
   fi
 
-  read -p "New directory name: $relative_directory_path" -r new_dir
+  read -p "New directory name: " -i "$relative_directory_path" -e new_dir
   new_dir="$item/${new_dir#/}"
   new_dir="${new_dir%/}"
   if [ -e "$new_dir" ]; then
-    echo "Unable to create $new_dir, it already exists, Enter to continue.."
-    read -r anykey
+    read -p "Unable to create $new_dir, it already exists, press any key to continue.." anykey
     return 1
   fi
   mkdir -p "$new_dir" || return 1
@@ -128,8 +127,7 @@ new_secret() {
     filepath="${OVERTAKE_VAULT_DIR%/}/${filename%.gpg}.gpg"
 
     if [ -e "$filepath" ]; then
-      echo "Secret $filename already exists, retry? [YES|no]"
-      read -r yn
+      read -p "Secret $filename already exists, retry? [YES|no]: " yn
       [ "$yn" = "no" ] && return
       continue
     else
@@ -208,8 +206,7 @@ while true; do
       if [ $? -eq 0 ]; then
         return_dir="${item%/*}"
       else
-        echo "Directory ${item#$OVERTAKE_VAULT_DIR/} is not empty, delete it? [yes|NO]"
-        read -r yn
+        read -p "Directory ${item#$OVERTAKE_VAULT_DIR/} is not empty, delete it? [yes|NO]" yn
         if [ "$yn" = "yes" ]; then
           rm -Rf "$item"
           return_dir="${item%/*}"
@@ -230,14 +227,13 @@ while true; do
     SECRET) selected_option="$(select_secret_option "$item")" ;;
     SECRET_COPY)
       overtake show --copy "$item" > /dev/null
-      read -p "Copied $name secret to clipboard, press Enter to continue.." -r x
+      read -p "Copied $name secret to clipboard, press any key to continue.." -r x
       selected_option="SECRET:$item"
     ;;
     SECRET_DELETE)
       secret="${item#$OVERTAKE_VAULT_DIR/}"
       secret="${secret%.gpg}"
-      echo "Delete secret $secret? [yes|NO]"
-      read -r yn
+      read -p "Delete secret $secret? [yes|NO]: " yn
       [ "$yn" = "yes" ] && rm "$item"
       selected_option="DIRECTORY:${item%/*}"
     ;;
@@ -256,8 +252,7 @@ while true; do
       [ -f "$item" ] && target_path="${target_path%.gpg}.gpg"
 
       if [ -e "$target_path" ]; then
-        echo "Path $target_path already exists, overwrite it? [yes|NO]"
-        read -r yn
+        read -p "Path $target_path already exists, overwrite it? [yes|NO]: " yn
         if [ "$yn" = "yes" ]; then
           rm -Rf "$target_path"
         else
