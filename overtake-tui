@@ -114,6 +114,73 @@ create_directories() {
 }
 
 
+new_secret() {
+  while true; do
+
+    if [ "$item" = "$OVERTAKE_VAULT_DIR" ]; then
+      display_path=""
+    else
+      display_path="${item#$OVERTAKE_VAULT_DIR/}/"
+    fi
+
+    read -e -p 'New secret name: ' -i "$display_path" -r filename
+
+    filepath="${OVERTAKE_VAULT_DIR%/}/${filename%.gpg}.gpg"
+
+    if [ -e "$filepath" ]; then
+      echo "Secret $filename already exists, retry? [YES|no]"
+      read -r yn
+      [ "$yn" = "no" ] && exit
+      continue
+    fi
+
+    echo 'Use template for username and passphrase? [YES|no] '
+    read -r create_username_passphrase
+
+    # Want to edit file manually from just set empty template
+    if [ "${create_username_passphrase:0:1}" = "n" ]; then
+      secret=''
+      break
+    fi
+
+    echo -n 'User: '
+    read -r user
+
+    echo -n 'Passphrase (empty to generate one): '
+    read -r passphrase
+
+    if [ "$passphrase" = "" ]; then
+      gobbeldygook="$(pwgen -cnyB1s)"
+      passphrase="$(xkcdpass --case first | tr '\n' ' ' | awk "\$1 = toupper(\$1) { print \$1\"-\"\$2\"-\"\$3\"-\"\$4\"-$gobbeldygook\" }")"
+    fi
+
+    echo ""
+    echo "Secret name:	$filename"
+    echo "User:		$user"
+    echo "Passphrase:	$passphrase"
+
+    echo ""
+    echo -n 'Create login with these details? [YES|no|cancel] '
+    read -r create_confirmed
+
+    case ${create_confirmed:0:1} in
+      n) echo "" && continue ;;
+      c) cancel="yes" && break ;;
+      *) secret="login=$user:$passphrase" && break ;;
+    esac
+  done
+
+  if [ "$cancel" != "yes" ]; then
+    if [ "$secret" = "" ]; then
+      overtake add "$filepath"
+    else
+      printf '%s' "$secret" | overtake add "$filepath" -
+    fi
+
+    overtake show --copy "$filepath"
+  fi
+}
+
 # Get vault dir
 
 if [ -z "$OVERTAKE_VAULT_DIR" ]; then
@@ -181,71 +248,7 @@ while true; do
       selected_option="DIRECTORY:$return_dir"
     ;;
     SECRET_NEW)
-      while true; do
-
-        if [ "$item" = "$OVERTAKE_VAULT_DIR" ]; then
-          display_path=""
-        else
-          display_path="${item#$OVERTAKE_VAULT_DIR/}/"
-        fi
-
-        read -e -p 'New secret name: ' -i "$display_path" -r filename
-
-        filepath="${OVERTAKE_VAULT_DIR%/}/${filename%.gpg}.gpg"
-
-        if [ -e "$filepath" ]; then
-          echo "Secret $filename already exists, retry? [YES|no]"
-          read -r yn
-          [ "$yn" = "no" ] && exit
-          continue
-        fi
-
-        echo 'Use template for username and passphrase? [YES|no] '
-        read -r create_username_passphrase
-
-        # Want to edit file manually from just set empty template
-        if [ "${create_username_passphrase:0:1}" = "n" ]; then
-          secret=''
-          break
-        fi
-
-        echo -n 'User: '
-        read -r user
-
-        echo -n 'Passphrase (empty to generate one): '
-        read -r passphrase
-
-        if [ "$passphrase" = "" ]; then
-          gobbeldygook="$(pwgen -cnyB1s)"
-          passphrase="$(xkcdpass --case first | tr '\n' ' ' | awk "\$1 = toupper(\$1) { print \$1\"-\"\$2\"-\"\$3\"-\"\$4\"-$gobbeldygook\" }")"
-        fi
-
-        echo ""
-        echo "Secret name:	$filename"
-        echo "User:		$user"
-        echo "Passphrase:	$passphrase"
-
-        echo ""
-        echo -n 'Create login with these details? [YES|no|cancel] '
-        read -r create_confirmed
-
-        case ${create_confirmed:0:1} in
-          n) echo "" && continue ;;
-          c) cancel="yes" && break ;;
-          *) secret="login=$user:$passphrase" && break ;;
-        esac
-      done
-
-      if [ "$cancel" != "yes" ]; then
-        if [ "$secret" = "" ]; then
-          overtake add "$filepath"
-        else
-          printf '%s' "$secret" | overtake add "$filepath" -
-        fi
-
-        overtake show --copy "$filepath"
-      fi
-
+      new_secret
       selected_option="DIRECTORY:$item"
     ;;
     SECRET) selected_option="$(select_secret_option "$item")" ;;
