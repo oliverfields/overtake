@@ -536,7 +536,7 @@ if [ -e "$config_file" ]; then
       recipients=*) [ -z "$OVERTAKE_RECIPIENTS" ] && OVERTAKE_RECIPIENTS="${line#recipients=}" ;;
       sync_git=*) [ -z "$OVERTAKE_SYNC_GIT" ] && OVERTAKE_SYNC_GIT="${line#sync_git=}" ;;
       vimrc_overtake=*) [ -z "$OVERTAKE_VIMRC" ] && OVERTAKE_VIMRC="${line#vimrc_overtake=}" ;;
-      overtake_extensions=*) [ -z "$OVERTAKE_EXTENSIONS" ] && OVERTAKE_EXTENSIONS="${line#overtake_extensions=}" ;;
+      extensions=*) [ -z "$OVERTAKE_EXTENSIONS" ] && OVERTAKE_EXTENSIONS="${line#extensions=}" ;;
       *)
         echo "Warning: Unknown setting $line in $config_file"
       ;;

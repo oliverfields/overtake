@@ -130,59 +130,19 @@ new_secret() {
     if [ -e "$filepath" ]; then
       echo "Secret $filename already exists, retry? [YES|no]"
       read -r yn
-      [ "$yn" = "no" ] && exit
+      [ "$yn" = "no" ] && return
       continue
-    fi
-
-    echo 'Use template for username and passphrase? [YES|no] '
-    read -r create_username_passphrase
-
-    # Want to edit file manually from just set empty template
-    if [ "${create_username_passphrase:0:1}" = "n" ]; then
-      secret=''
+    else
       break
     fi
-
-    echo -n 'User: '
-    read -r user
-
-    echo -n 'Passphrase (empty to generate one): '
-    read -r passphrase
-
-    if [ "$passphrase" = "" ]; then
-      gobbeldygook="$(pwgen -cnyB1s)"
-      passphrase="$(xkcdpass --case first | tr '\n' ' ' | awk "\$1 = toupper(\$1) { print \$1\"-\"\$2\"-\"\$3\"-\"\$4\"-$gobbeldygook\" }")"
-    fi
-
-    echo ""
-    echo "Secret name:	$filename"
-    echo "User:		$user"
-    echo "Passphrase:	$passphrase"
-
-    echo ""
-    echo -n 'Create login with these details? [YES|no|cancel] '
-    read -r create_confirmed
-
-    case ${create_confirmed:0:1} in
-      n) echo "" && continue ;;
-      c) cancel="yes" && break ;;
-      *) secret="login=$user:$passphrase" && break ;;
-    esac
   done
 
-  if [ "$cancel" != "yes" ]; then
-    if [ "$secret" = "" ]; then
-      overtake add "$filepath"
-    else
-      printf '%s' "$secret" | overtake add "$filepath" -
-    fi
-
-    overtake show --copy "$filepath"
-  fi
+  overtake add "$filepath"
+  overtake show --copy "$filepath"
 }
 
-# Get vault dir
 
+# Get vault dir
 if [ -z "$OVERTAKE_VAULT_DIR" ]; then
   OVERTAKE_VAULT_DIR="$(grep '^vault_dir=' "$HOME/.config/overtake.conf")"
   OVERTAKE_VAULT_DIR="${OVERTAKE_VAULT_DIR#vault_dir=}"
@@ -191,6 +151,18 @@ if [ -z "$OVERTAKE_VAULT_DIR" ]; then
 
   [ "$OVERTAKE_VAULT_DIR" = "" ] && OVERTAKE_VAULT_DIR="$HOME/.secrets"
 fi
+
+# Get extension file
+if [ -z "$OVERTAKE_EXTENSIONS" ]; then
+  OVERTAKE_EXTENSIONS="$(grep '^extensions=' "$HOME/.config/overtake.conf")"
+  OVERTAKE_EXTENSIONS="${OVERTAKE_EXTENSIONS#extensions=}"
+  OVERTAKE_EXTENSIONS="${OVERTAKE_EXTENSIONS/\~/$HOME}"
+  OVERTAKE_EXTENSIONS="${OVERTAKE_EXTENSIONS/\$HOME/$HOME}"
+
+  [ "$OVERTAKE_EXTENSIONS" = "" ] && OVERTAKE_EXTENSIONS="$HOME/.local/overtake/extensions.sh"
+fi
+
+[ -e "$OVERTAKE_EXTENSIONS" ] && source "$OVERTAKE_EXTENSIONS"
 
 # Need to set initial ACTION:PATH for while loop
 selected_option="DIRECTORY:${OVERTAKE_VAULT_DIR%/}"
@@ -248,7 +220,11 @@ while true; do
       selected_option="DIRECTORY:$return_dir"
     ;;
     SECRET_NEW)
-      new_secret
+      if [[ $(type -t OVERTAKE_EXT_new_secret_tui) == function ]]; then
+        OVERTAKE_EXT_new_secret_tui
+      else
+        new_secret
+      fi
       selected_option="DIRECTORY:$item"
     ;;
     SECRET) selected_option="$(select_secret_option "$item")" ;;

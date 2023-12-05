@@ -23,6 +23,30 @@
 #}
 
 
+# Create own tui for adding secrets
+#OVERTAKE_EXT_new_secret_tui() {
+#  while true; do
+#
+#    if [ "$item" = "$OVERTAKE_VAULT_DIR" ]; then
+#      display_path=""
+#    else
+#      display_path="${item#$OVERTAKE_VAULT_DIR/}/"
+#    fi
+#
+#    read -e -p 'New secret name: ' -i "$display_path" -r filename
+#
+#    filepath="${OVERTAKE_VAULT_DIR%/}/${filename%.gpg}.gpg"
+#
+#    if [ -e "$filepath" ]; then
+#      echo "Secret $filename already exists, retry? [YES|no]"
+#      read -r yn
+#      [ "$yn" = "no" ] && exit
+#      continue
+#    fi
+#  done
+#}
+
+
 # Define this function to use another editor than vi. It will be called in one of two contexts:
 #
 # 1. When adding a new file to the vault
