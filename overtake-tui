@@ -226,8 +226,8 @@ while true; do
     ;;
     SECRET) selected_option="$(select_secret_option "$item")" ;;
     SECRET_COPY)
-      overtake show --copy "$item" > /dev/null
-      read -p "Copied $name secret to clipboard, press any key to continue.." -r x
+      overtake show --copy "$item"
+      read -p "Press any key to continue.." -r x
       selected_option="SECRET:$item"
     ;;
     SECRET_DELETE)
