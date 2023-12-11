@@ -5,7 +5,8 @@ Overtake is a CLI client for managing a vault containing secrets. The vault is a
 
 ## But, why?
 
-- Editing passwords is done entierly in memory, nothing is written to disk (requires vim)
+- Secrets are encrypted using GPG
+- Editing secrets is done entierly in memory, nothing is written to disk (requires vim)
 - Automatic pull and push to remote git repos
 - Create new files populated with output from a bash script
 - A TUI for managing the vault based on the excellent [fzf](https://github.com/junegunn/fzf)
@@ -25,7 +26,7 @@ Some commands to try.
 - `overtake-tui`
 - Create a new encrypted file in the vault `overtake add <name>`
 - Decrypt file and copy to clipboard `overtake copy <name>`
-- List passwords `overtake list`, the arguments `--full` and `--tree` change the list output
+- List secrets `overtake list`, the arguments `--full` and `--tree` change the list output
 
 
 # GPG
@@ -82,7 +83,7 @@ Now any add, edit or delete will update the file and do git add & commit the cha
 
 Overtake can support keeping multiple git repos synced. This is done by cloning the desired git repos into the vault directory and ensuring the repos ignore each other using .gitignore.
 
-Assume we have one git repo for the vault, but also want to include passwords from a second git repo. This could be setup as such.
+Assume we have one git repo for the vault, but also want to include secrets from a second git repo. This could be setup as such.
 
 ```
   git clone <main vault repo> ~/.secrets

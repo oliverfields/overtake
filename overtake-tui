@@ -67,7 +67,7 @@ select_secret_option() {
   secret_name="${secret_name%.gpg}"
   info_text="Secret: $secret_name"
 
-  # Can't go further up than password store
+  # Can't go further up than vault dir
   [ "$back_dir" = "${OVERTAKE_VAULT_DIR}" ] || options+=("${lime}BACK$end	DIRECTORY:$back_dir")
 
   options+=("${lime}QUIT$end	QUIT")

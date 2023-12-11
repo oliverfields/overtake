@@ -188,7 +188,7 @@ relative_file_path()
   # Cut of .gpg extension if exists, and pop it back on, so we can handle with or without
   file_path="${file_path%.gpg}.gpg"
 
-  # Strip password dir
+  # Strip vault dir
   file_path="${file_path#"$OVERTAKE_VAULT_DIR"/}"
 
   echo -n "$file_path"
