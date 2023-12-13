@@ -136,7 +136,7 @@ new_secret() {
   done
 
   overtake add "$filepath"
-  overtake show --copy "$filepath"
+  overtake copy "$filepath"
 }
 
 
@@ -226,7 +226,7 @@ while true; do
     ;;
     SECRET) selected_option="$(select_secret_option "$item")" ;;
     SECRET_COPY)
-      overtake show --copy "$item"
+      overtake copy "$item"
       read -p "Press any key to continue.." -r x
       selected_option="SECRET:$item"
     ;;
