@@ -45,16 +45,16 @@ _overtake_complete()
   prev=${COMP_WORDS[COMP_CWORD-1]}
 
   if [ $COMP_CWORD -eq 1 ]; then
-    COMPREPLY=( $(compgen -W "add edit recipients git help list show" -- $cur) )
+    COMPREPLY=( $(compgen -W "add copy edit recipients git help list show" -- $cur) )
     _overtake_complete_entries
   elif [ $COMP_CWORD -gt 1 ]; then
     case $mode in
-      add|delete|edit)
+      add|delete|edit|copy)
         # Complete *.gpg file paths
         _overtake_complete_entries
       ;;
       show)
-        [ ${#COMP_WORDS[@]} -eq 3 ] && COMPREPLY=( $(compgen -W "--copy -c --no-clear -n" -- $cur))
+        [ ${#COMP_WORDS[@]} -eq 3 ] && COMPREPLY=( $(compgen -W "--no-clear -n" -- $cur))
         _overtake_complete_entries
       ;;
       list)

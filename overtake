@@ -39,6 +39,9 @@ The argument [file] is optional, if not specified a file selection dialogue will
 
 			Pipes output of xkcdpass to editor, and on save writes encrypted content to $OVERTAKE_VAULT_DIR/login.gpg
 
+	\e[1mcopy\e[0m <file>
+		Default select file from list and copy decrypted contents to terminal
+
 	\e[1medit\e[0m [file]
 		Decrypt file, open in vim for editing and encrypt contents back to <file>, decrypted exists only in memory, it is not written to disk
 
@@ -69,11 +72,8 @@ The argument [file] is optional, if not specified a file selection dialogue will
 		--sync
 			Update recipients to match those specified. If new gpg key, a sync must be run
 
-	\e[1mshow\e[0m <-copy|-c|--no-clear|-n> <file>
+	\e[1mshow\e[0m <--no-clear|-n> <file>
 		Default select file from list and print decrypted contents to terminal
-
-		--copy, -c
-			Copy decrypted file to clipboard
 
 		--no-clear, -n
 			Disable clear screen prompt
@@ -90,12 +90,13 @@ usage()
 {
   echo -e "Usage: overtake [file]
 	add <file> [-|/dev/stdin]
+	copy <file>
 	edit [file]
 	git [--commit-push-all|--list-repositories|--pull-all]
 	help
 	list [--absolute|--pretty]
 	recipients [--sync]
-    show [-copy|--no-clear] [file]"
+	show [--no-clear|-n] [file]"
   exit 1
 }
 
@@ -459,49 +460,42 @@ print_decrypted_content()
   gpg_decrypt_file "$file"
 }
 
-# Decrypt and show to user either in terminal or via clipboard
+# Decrypt and print to terminal
 show()
 {
   local option="notset"
 
-  case $# in
-    0) file="" ;;
-    1)
-      # Is first arg a file or an option
-      if [[ "$1" =~ ^(--no-clear|-n|--copy|-c)$ ]]; then
-        option="$1"
-        file="$2"
-      else
-        file="$1"
-      fi
-    ;;
-    2)
-      option="$1"
-      file="$2"
-    ;;
-    *) usage ;;
-  esac
+  # Is first arg a file or an option
+  if [[ "$1" =~ ^(--no-clear|-n)$ ]]; then
+    option="$1"
+    file="$2"
+  else
+    file="$1"
+  fi
 
   # Default, print decrypted content to terminal
-  if [ "$option" = "notset" ] || [ "$option" = "--no-clear" ] || [ "$option" = "-n" ]; then
-    print_decrypted_content "$file"
+  print_decrypted_content "$file"
 
-    # Unless disabled, show prompt to clear terminal
-    if [ "$option" = "notset" ]; then
-      echo ""
-      read -p "Press any key to clear terminal and continue.." key
-      clear
-    fi
-  elif [ "$option" = "--copy" ] || [ "$option" = "-c" ]; then
-    # If config file has defined a function for clipboard, use it to copy
-    if [[ $(type -t OVERTAKE_EXT_clipboard) == function ]]; then
-      print_decrypted_content "$file" | OVERTAKE_EXT_clipboard
-    # Else just copy secret to clipboard
-    else
-      print_decrypted_content "$file" | xsel --clipboard
-    fi 
+  # Unless disabled, show prompt to clear terminal
+  if [ "$option" = "notset" ]; then
+    echo ""
+    read -p "Press any key to clear terminal and continue.." key
+    clear
+  fi
+}
+
+
+# Decrypt and copy to terminal
+copy()
+{
+  file="$1"
+
+  # If config file has defined a function for clipboard, use it to copy
+  if [[ $(type -t OVERTAKE_EXT_clipboard) == function ]]; then
+    print_decrypted_content "$file" | OVERTAKE_EXT_clipboard
+  # Else just copy secret to clipboard
   else
-    usage
+    print_decrypted_content "$file" | xsel --clipboard
   fi
 }
 
@@ -561,7 +555,7 @@ OVERTAKE_VAULT_DIR="${OVERTAKE_VAULT_DIR%/}"
 
 # Set mode
 if [ $# -eq 0 ]; then
-  mode="show"
+  mode="copy"
 else
   mode="$1"
 fi
@@ -621,14 +615,20 @@ case $mode in
       *) usage ;;
     esac
   ;;
+  copy)
+    case $# in
+      0|1) copy ;;
+      2) copy "$2" ;;
+      *) usage ;;
+    esac
+  ;;
   show)
     case $# in
-      0|1) show ;;
+      1) show ;;
       2) show "$2" ;;
       3) show "$2" "$3" ;;
       *) usage ;;
     esac
-
   ;;
   git)
     case $# in
