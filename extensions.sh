@@ -79,3 +79,9 @@
 #  # Tidy up
 #  rm "$tmp_file"
 #}
+
+# Use a different file chooser. This function will be piped a list of files to choose from on stdin and needs to print the chosen file
+#OVERTAKE_EXT_file_chooser() {
+#  fzy
+#}
+

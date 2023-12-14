@@ -385,7 +385,7 @@ add()
 }
 
 
-# Decrypt, edit and reencrypt file, file passed as argument or selected from fzf
+# Decrypt, edit and reencrypt file, file passed as argument or select one
 edit()
 {
   file="$(get_file_path "$1")"
@@ -437,7 +437,11 @@ get_file_path()
 
   # If no argument, get user to select a file to edit
   if [ "$file" = "" ]; then
-    file="$(list_pretty_paths | fzf "--header=$prompt" --exact)"
+    if [[ $(type -t OVERTAKE_EXT_file_chooser) == function ]]; then
+      file="$(list_pretty_paths | OVERTAKE_EXT_file_chooser)"
+    else
+      file="$(list_pretty_paths | fzf "--header=$prompt" --exact)"
+    fi
     [ "$file" = "" ] && return 0
   fi
 
