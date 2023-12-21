@@ -103,12 +103,13 @@ create_directories() {
   fi
 
   read -p "New directory name: " -i "$relative_directory_path" -e new_dir
-  new_dir="$item/${new_dir#/}"
+  new_dir="$OVERTAKE_VAULT_DIR/${new_dir#/}"
   new_dir="${new_dir%/}"
   if [ -e "$new_dir" ]; then
     read -p "Unable to create $new_dir, it already exists, press any key to continue.." anykey
     return 1
   fi
+
   mkdir -p "$new_dir" || return 1
 }
 
