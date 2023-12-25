@@ -5,6 +5,37 @@
 # Halt on error
 set -e
 
+config_file="$HOME/.config/overtake.conf"
+default_vault_dir="$HOME/.secrets"
+
+# If script is sourced, cd to vault_dir and return
+# Need to run first so shell is not "polluted" by all that sourcing this file would entail
+case ${0##*/} in
+  bash|-bash|sh|-sh)
+    if [ "$OVERTAKE_VAULT_DIR" != "" ]; then
+      vault_dir="$OVERTAKE_VAULT_DIR"
+    else
+      vault_dir="$(grep '^vault_dir=' "$config_file" | sed 's/.*=//')"
+
+      # Expand home directory
+      vault_dir="${vault_dir/\~/$HOME}"
+      vault_dir="${vault_dir/\$HOME/$HOME}"
+    fi
+
+    if [ "$vault_dir" = "" ]; then
+      vault_dir="$default_vault_dir"
+    fi
+
+    [ -d "$vault_dir" ] && cd "$vault_dir" || echo "Unable to cd to $vault_dir"
+    # Tidy up so no variables are left in shell
+    unset vault_dir
+    unset default_vault_dir
+    unset config_file
+    # Return to stop any more being added to shell
+    return
+  ;;
+esac
+
 
 # Print error message and exit
 error()
@@ -24,6 +55,8 @@ error()
 help()
 {
   echo -e 'Manage vault of secrets. The vault is directory of GPG encrypted secrets. The vault can sync one or more git directories.
+
+Sourcing the command will change directory to the vault dir, e.g. $ . overtake
 
 The argument [file] is optional, if not specified a file selection dialogue will be opened.
 
@@ -515,8 +548,6 @@ gpg_decrypt_file()
 # Thanks MrYellow https://unix.stackexchange.com/a/721679
 OVERTAKE_DIR=$( cd -- "$( dirname -- "$(readlink -f "${BASH_SOURCE[0]}" || ${BASH_SOURCE[0]})" )" &> /dev/null && pwd )
 
-config_file="$HOME/.config/overtake.conf"
-
 # Load config
 if [ -e "$config_file" ]; then
   while read -r line; do
@@ -543,7 +574,7 @@ if [ -e "$config_file" ]; then
 fi
 
 # Set defaults if no environment variables found or values not set in config file
-[ -z "$OVERTAKE_VAULT_DIR" ] && OVERTAKE_VAULT_DIR="$HOME/.secrets"
+[ -z "$OVERTAKE_VAULT_DIR" ] && OVERTAKE_VAULT_DIR="$default_vault_dir"
 [ -z "$OVERTAKE_RECIPIENTS" ] && OVERTAKE_RECIPIENTS="your@gpg.key"
 [ -z "$OVERTAKE_SYNC_GIT" ] && OVERTAKE_SYNC_GIT="no"
 [ -z "$OVERTAKE_VIMRC" ] && OVERTAKE_VIMRC="$OVERTAKE_DIR/vimrc_overtake"
