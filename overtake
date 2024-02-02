@@ -450,9 +450,9 @@ edit_then_encrypt()
     stdin+=("
 ")
 
-    printf "%s" "${stdin[@]}" | GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_VIMRC" -
+    printf "%s" "${stdin[@]}" | GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term --noplugin -u "$OVERTAKE_VIMRC" -
   else
-    GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term -u "$OVERTAKE_VIMRC"
+    GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term --noplugin -u "$OVERTAKE_VIMRC"
   fi
 }
 

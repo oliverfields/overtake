@@ -26,6 +26,12 @@ function ConfirmWrite()
 endfunction
 
 
+let overtake_vim_local = $HOME . '/.config/overtake.vim'
+if filereadable(overtake_vim_local)
+  execute 'source ' . overtake_vim_local
+endif
+
+
 " Do not write to ~/.viminfo
 set viminfo=
 
@@ -52,3 +58,4 @@ cmap q q!
 
 " Disable default start screen info
 set shm+=I
+
