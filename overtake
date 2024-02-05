@@ -121,15 +121,16 @@ The argument [file] is optional, if not specified a file selection dialogue will
 # Print usage message
 usage()
 {
-  echo -e "Usage: overtake [file]
-	add <file> [-|/dev/stdin]
-	copy <file>
-	edit [file]
-	git [--commit-push-all|--list-repositories|--pull-all]
-	help
-	list [--absolute|--pretty]
-	recipients [--sync]
-	show [--no-clear|-n] [file]"
+  echo -e "USAGE
+	\e[1movertake\e[0m [file]
+		\e[1madd\e[0m <file> [-|/dev/stdin]
+		\e[1mcopy\e[0m <file>
+		\e[1medit\e[0m [file]
+		\e[1mgit\e[0m [--commit-push-all|--list-repositories|--pull-all]
+		\e[1mhelp\e[1m
+		\e[1mlist\e[0m [--absolute|--pretty]
+		\e[1mrecipients\e[0m [--sync]
+		\e[1mshow\e[0m [--no-clear|-n] [file]"
   exit 1
 }
 
