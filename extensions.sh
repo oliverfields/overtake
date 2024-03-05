@@ -85,3 +85,13 @@
 #  fzy
 #}
 
+
+# Clear clipboard after x seconds, function is passed seconds to wait until clearing clipboard
+#OVERTAKE_EXT_clear_clipboard() {
+#  password_then="$(xsel --output --clipboard)"
+#  sleep $1
+#  password_now="$(xsel --output --clipboard)"
+#  if [ "$password_then" = "$password_now" ]; then
+#     xsel --clear --clipboard && notify-send "Secret removed from clipboard"
+#  fi
+#}
