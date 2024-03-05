@@ -244,6 +244,22 @@ list_absolute_paths()
 }
 
 
+list_age()
+{
+  for secret_full_path in $(find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg'); do
+    secret_dir="${secret_full_path%/*}"
+    secret_filename="${secret_full_path##*/}"
+    secret_relative_dir="${secret_full_path#$OVERTAKE_VAULT_DIR/}"
+    secret_pretty="${secret_relative_dir%.gpg}"
+
+    cd "$secret_dir" || error "Unable to cd to $secret_dir"
+    secret_git_modified="$(git log -1 "--pretty=format:%cs" -- "$secret_filename")" || error "Unable to get git modified date for $secret_full_path"
+
+    echo "$secret_git_modified $secret_pretty"
+  done | sort -n
+}
+
+
 # List as tree
 list_tree()
 {
@@ -652,6 +668,7 @@ case $mode in
         case $2 in
           --absolute) list_absolute_paths ;;
           --pretty) list_pretty_paths ;;
+          --age) list_age ;;
           *) usage ;;
         esac
       ;;

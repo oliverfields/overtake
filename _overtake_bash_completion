@@ -58,7 +58,7 @@ _overtake_complete()
         _overtake_complete_entries
       ;;
       list)
-        COMPREPLY=( $(compgen -W "--absolute --pretty" -- $cur) )
+        COMPREPLY=( $(compgen -W "--absolute --pretty --age" -- $cur) )
       ;;
       git)
         COMPREPLY=( $(compgen -W "--list-repositories --commit-push-all --pull-all" -- $cur) )
