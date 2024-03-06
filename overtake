@@ -256,7 +256,7 @@ list_age()
     secret_git_modified="$(git log -1 "--pretty=format:%cs" -- "$secret_filename")" || error "Unable to get git modified date for $secret_full_path"
 
     echo "$secret_git_modified $secret_pretty"
-  done | sort -n
+  done | sort -nr
 }
 
 
