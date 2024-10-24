@@ -246,7 +246,9 @@ list_absolute_paths()
 
 list_age()
 {
-  for secret_full_path in $(find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg'); do
+  #for secret_full_path in "$(find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg')"; do
+  find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg' \
+  | while IFS='' read -r secret_full_path; do
     secret_dir="${secret_full_path%/*}"
     secret_filename="${secret_full_path##*/}"
     secret_relative_dir="${secret_full_path#$OVERTAKE_VAULT_DIR/}"
@@ -254,9 +256,9 @@ list_age()
 
     cd "$secret_dir" || error "Unable to cd to $secret_dir"
     secret_git_modified="$(git log -1 "--pretty=format:%cs" -- "$secret_filename")" || error "Unable to get git modified date for $secret_full_path"
-
     echo "$secret_git_modified $secret_pretty"
   done | sort -nr
+  #done | sort -nr
 }
 
 
