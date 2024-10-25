@@ -160,9 +160,8 @@ batch_repos_cmd()
   #echo -n "Syncing vault.."
 
   # Find all git repos in vault
-  for repo in $(find "$OVERTAKE_VAULT_DIR" -type d -name '.git'); do
-
-
+  find "$OVERTAKE_VAULT_DIR" -type d -name '.git' \
+  | while IFS='' read -r repo; do
     git_dir="${repo%/*}"
 
     cd "$git_dir" || error "Unable to cd to $git_dir"
@@ -195,8 +194,6 @@ batch_repos_cmd()
       ;;
     esac
   done
-
-  #echo " done"
 }
 
 
@@ -246,7 +243,6 @@ list_absolute_paths()
 
 list_age()
 {
-  #for secret_full_path in "$(find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg')"; do
   find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg' \
   | while IFS='' read -r secret_full_path; do
     secret_dir="${secret_full_path%/*}"
@@ -258,7 +254,6 @@ list_age()
     secret_git_modified="$(git log -1 "--pretty=format:%cs" -- "$secret_filename")" || error "Unable to get git modified date for $secret_full_path"
     echo "$secret_git_modified $secret_pretty"
   done | sort -nr
-  #done | sort -nr
 }
 
 
@@ -276,7 +271,8 @@ list_tree()
 
 list_git_repos()
 {
-  for repo in $(find "$OVERTAKE_VAULT_DIR" -type d -name '.git'); do
+  find "$OVERTAKE_VAULT_DIR" -type d -name '.git' \
+  | while IFS='' read -r repo; do
     cd "${repo%/.git}"
     echo "$PWD/.git $(git ls-remote --get-url origin)"
   done | sort
@@ -291,7 +287,8 @@ sync_recipients()
 
   trap "rm -f '$tmp_file'" EXIT
 
-  for file in $(find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg'); do
+  find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg' \
+  | while IFS='' read -r file; do
     recipients="$(get_configured_recipients "$file")"
     recipients="--recipient ${recipients// / --recipient }"
 
@@ -306,7 +303,8 @@ sync_recipients()
 list_recipients()
 {
 
-  for file in $(find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg' | sort); do
+  find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg' | sort \
+  | while IFS='' read -r file; do
     actual_recipients="$(get_gpg_file_recipients "$file")"
     configured_recipients="$(get_configured_recipients "$file")"
 
