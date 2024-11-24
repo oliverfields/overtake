@@ -12,8 +12,8 @@ default_vault_dir="$HOME/.secrets"
 # Need to run first so shell is not "polluted" by all that sourcing this file would entail
 case ${0##*/} in
   bash|-bash|sh|-sh)
-    if [ "$OVERTAKE_VAULT_DIR" != "" ]; then
-      vault_dir="$OVERTAKE_VAULT_DIR"
+    if [ "$VAULT_DIR" != "" ]; then
+      vault_dir="$VAULT_DIR"
     else
       vault_dir="$(grep '^vault_dir=' "$config_file" | sed 's/.*=//')"
 
@@ -61,16 +61,16 @@ Sourcing the command will change directory to the vault dir, e.g. $ . overtake
 The argument [file] is optional, if not specified a file selection dialogue will be opened.
 
 	\e[1madd\e[0m <file> [-|/dev/stdin]
-		Create new file in $OVERTAKE_VAULT_DIR, path must be relative (not start with /). If path contains directories, these will also be created. Specifying - or /dev/stdin will read contents of stdin into editor(vim) for editing and before encrypting
+		Create new file in $VAULT_DIR, path must be relative (not start with /). If path contains directories, these will also be created. Specifying - or /dev/stdin will read contents of stdin into editor(vim) for editing and before encrypting
 
 		\e[1mExamples\e[0m
 			$ overtake add gnupg.org/login
 
-			Creates $OVERTAKE_VAULT_DIR/gnupg.org directory if not already created, and login.gpg encrypted file
+			Creates $VAULT_DIR/gnupg.org directory if not already created, and login.gpg encrypted file
 
 			$ xkcdpass | overtake add login -
 
-			Pipes output of xkcdpass to editor, and on save writes encrypted content to $OVERTAKE_VAULT_DIR/login.gpg
+			Pipes output of xkcdpass to editor, and on save writes encrypted content to $VAULT_DIR/login.gpg
 
 	\e[1mcopy\e[0m <file>
 		Default select file from list and copy decrypted contents to terminal
@@ -91,7 +91,7 @@ The argument [file] is optional, if not specified a file selection dialogue will
 			Manually trigger pulls on all git repositories in vault
 
 	\e[1mlist\e[0m [--absolute|--pretty]
-		List .gpg files in $OVERTAKE_VAULT_DIR, defaults to tree view
+		List .gpg files in $VAULT_DIR, defaults to tree view
 
 		--absoulte
 			Lists full paths
@@ -100,7 +100,7 @@ The argument [file] is optional, if not specified a file selection dialogue will
 			Lists vault relative and pretty paths
 
 	\e[1mrecipients\e[0m [--sync]
-		List recipients for vault .gpg files. Recipients space separated and set in .gpg-id files, in config using setting recipients or by environment variable OVERTAKE_RECIPIENTS
+		List recipients for vault .gpg files. Recipients space separated and set in .gpg-id files, in config using setting recipients or by environment variable RECIPIENTS
 
 		--sync
 			Update recipients to match those specified. If new gpg key, a sync must be run
@@ -141,7 +141,7 @@ batch_repos_cmd()
 {
   # If git mode we want to git, so only honor sync git setting if another mode
   if [ "$mode" != "git" ]; then
-    if [ "$OVERTAKE_SYNC_GIT" != "yes" ]; then
+    if [ "$SYNC_GIT" != "yes" ]; then
       return
     fi
   fi
@@ -160,7 +160,7 @@ batch_repos_cmd()
   #echo -n "Syncing vault.."
 
   # Find all git repos in vault
-  find "$OVERTAKE_VAULT_DIR" -type d -name '.git' \
+  find "$VAULT_DIR" -type d -name '.git' \
   | while IFS='' read -r repo; do
     git_dir="${repo%/*}"
 
@@ -207,7 +207,7 @@ absolute_file_path()
 
   # If file path does not start with a / it is relative and needs making absolute
   if [[ "$file_path" != /* ]]; then
-    file_path="$OVERTAKE_VAULT_DIR/$file_path"
+    file_path="$VAULT_DIR/$file_path"
   fi
 
   echo -n "$file_path"
@@ -222,7 +222,7 @@ relative_file_path()
   file_path="${file_path%.gpg}.gpg"
 
   # Strip vault dir
-  file_path="${file_path#"$OVERTAKE_VAULT_DIR"/}"
+  file_path="${file_path#"$VAULT_DIR"/}"
 
   echo -n "$file_path"
 }
@@ -231,23 +231,23 @@ relative_file_path()
 # List all gpg files in vault
 list_pretty_paths()
 {
-  list_absolute_paths | sed 's#^'$OVERTAKE_VAULT_DIR'/## ; s/\.gpg$//'
+  list_absolute_paths | sed 's#^'$VAULT_DIR'/## ; s/\.gpg$//'
 }
 
 
 list_absolute_paths()
 {
-  find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg'
+  find "$VAULT_DIR" -type f -name '*.gpg'
 }
 
 
 list_age()
 {
-  find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg' \
+  find "$VAULT_DIR" -type f -name '*.gpg' \
   | while IFS='' read -r secret_full_path; do
     secret_dir="${secret_full_path%/*}"
     secret_filename="${secret_full_path##*/}"
-    secret_relative_dir="${secret_full_path#$OVERTAKE_VAULT_DIR/}"
+    secret_relative_dir="${secret_full_path#$VAULT_DIR/}"
     secret_pretty="${secret_relative_dir%.gpg}"
 
     cd "$secret_dir" || error "Unable to cd to $secret_dir"
@@ -261,7 +261,7 @@ list_age()
 list_tree()
 {
   if command -v tree &> /dev/null; then
-    tree --noreport --dirsfirst "$OVERTAKE_VAULT_DIR" | sed 's/\.gpg$//'
+    tree --noreport --dirsfirst "$VAULT_DIR" | sed 's/\.gpg$//'
   else
     echo "Warning: Command tree not found so doing a plain list instead" > /dev/stderr
     list_pretty_paths
@@ -271,7 +271,7 @@ list_tree()
 
 list_git_repos()
 {
-  find "$OVERTAKE_VAULT_DIR" -type d -name '.git' \
+  find "$VAULT_DIR" -type d -name '.git' \
   | while IFS='' read -r repo; do
     cd "${repo%/.git}"
     echo "$PWD/.git $(git ls-remote --get-url origin)"
@@ -287,7 +287,7 @@ sync_recipients()
 
   trap "rm -f '$tmp_file'" EXIT
 
-  find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg' \
+  find "$VAULT_DIR" -type f -name '*.gpg' \
   | while IFS='' read -r file; do
     recipients="$(get_configured_recipients "$file")"
     recipients="--recipient ${recipients// / --recipient }"
@@ -303,7 +303,7 @@ sync_recipients()
 list_recipients()
 {
 
-  find "$OVERTAKE_VAULT_DIR" -type f -name '*.gpg' | sort \
+  find "$VAULT_DIR" -type f -name '*.gpg' | sort \
   | while IFS='' read -r file; do
     actual_recipients="$(get_gpg_file_recipients "$file")"
     configured_recipients="$(get_configured_recipients "$file")"
@@ -311,7 +311,7 @@ list_recipients()
     [ "$actual_recipients" = "" ] && error "No recipients found in $file"
     [ "$configured_recipients" = "" ] && error "No recipients configured for $file"
 
-    file_name="${file#$OVERTAKE_VAULT_DIR/}"
+    file_name="${file#$VAULT_DIR/}"
     file_name="${file_name%.gpg}"
 
     # Checking actual and configured are the same depends on both functions return recipients alphabetically sorted
@@ -343,7 +343,7 @@ get_gpg_file_recipients()
 }
 
 
-# Get all configured recipients from .gpg-id files, $OVERTAKE_RECIPIENTS
+# Get all configured recipients from .gpg-id files, $RECIPIENTS
 # Veryfi have gpg key available for each recipient
 get_configured_recipients()
 {
@@ -354,7 +354,7 @@ get_configured_recipients()
   cd "$dir_path"
 
   # Go up directory tree until find a valid .gpg-id file, quit if we gone passed the vault
-  while [ "$PWD" != "${OVERTAKE_VAULT_DIR%/*}" ]; do
+  while [ "$PWD" != "${VAULT_DIR%/*}" ]; do
     if [ -f "$PWD/.gpg-id" ]; then
       gpg_id_file="$PWD/.gpg-id"
       break
@@ -367,13 +367,13 @@ get_configured_recipients()
   fi
 
   # Add recipients from settings also
-  recipients_string="$OVERTAKE_RECIPIENTS $recipients_string"
+  recipients_string="$RECIPIENTS $recipients_string"
   recipients_string="${recipients_string/  / }"
 
   # Need to tidy up, remove any duplicates and verify that have recipient keys
   recipients_tmp_array=( $recipients_string )
 
-  [ ${#recipients_tmp_array[@]} -eq 0 ] && error "No gpg recipients defined in OVERTAKE_DEFAULT_RECIPIENTS or .gpg-id files"
+  [ ${#recipients_tmp_array[@]} -eq 0 ] && error "No gpg recipients defined in DEFAULT_RECIPIENTS or .gpg-id files"
 
   # Use associative array to weed out duplicates
   declare -A recipients
@@ -409,7 +409,7 @@ get_configured_recipients()
 # Try to add new encrypted file with newly generated passphrase, update git if applicable
 add()
 {
-  # If path contains OVERTAKE_VAULT_DIR, remove it, so we can handle both relative and absolute paths
+  # If path contains VAULT_DIR, remove it, so we can handle both relative and absolute paths
   file="$1"
   pipe_input="$2"
 
@@ -468,9 +468,9 @@ edit_then_encrypt()
     stdin+=("
 ")
 
-    printf "%s" "${stdin[@]}" | GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term --noplugin -u "$OVERTAKE_VIMRC" -
+    printf "%s" "${stdin[@]}" | GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term --noplugin -u "$VIMRC" -
   else
-    GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term --noplugin -u "$OVERTAKE_VIMRC"
+    GPG_RECIPIENTS="$recipients" GPG_ENCRYPTED_FILE="$save_path" vim --not-a-term --noplugin -u "$VIMRC"
   fi
 }
 
@@ -481,7 +481,7 @@ get_file_path()
   file="$1"
 
   if [ "$2" = "" ]; then
-    prompt="vault $OVERTAKE_VAULT_DIR using key $OVERTAKE_RECIPIENTS"
+    prompt="vault $VAULT_DIR using key $RECIPIENTS"
   else
     prompt="$2"
   fi
@@ -554,20 +554,20 @@ copy()
   fi
 
   # Setup job to clear clipboard in X seconds
-  [ $OVERTAKE_CLEAR_CLIPBOARD_SECONDS -gt 0 ] || return
+  [ $CLEAR_CLIPBOARD_SECONDS -gt 0 ] || return
 
   if [[ $(type -t OVERTAKE_EXT_clear_clipboard) == function ]]; then
-    OVERTAKE_EXT_clear_clipboard $OVERTAKE_CLEAR_CLIPBOARD_SECONDS & disown
+    OVERTAKE_EXT_clear_clipboard $CLEAR_CLIPBOARD_SECONDS & disown
   else
     (
       password_then="$(xsel --output --clipboard)"
-      sleep $OVERTAKE_CLEAR_CLIPBOARD_SECONDS
+      sleep $CLEAR_CLIPBOARD_SECONDS
       password_now="$(xsel --output --clipboard)"
       if [ "$password_then" = "$password_now" ]; then
         xsel --clear --clipboard
       fi
     ) > /dev/null 2>&1 & disown
-    echo "Clipboard will clear in $OVERTAKE_CLEAR_CLIPBOARD_SECONDS seconds"
+    echo "Clipboard will clear in $CLEAR_CLIPBOARD_SECONDS seconds"
   fi
 }
 
@@ -581,7 +581,7 @@ gpg_decrypt_file()
 
 
 # Thanks MrYellow https://unix.stackexchange.com/a/721679
-OVERTAKE_DIR=$( cd -- "$( dirname -- "$(readlink -f "${BASH_SOURCE[0]}" || ${BASH_SOURCE[0]})" )" &> /dev/null && pwd )
+DIR=$( cd -- "$( dirname -- "$(readlink -f "${BASH_SOURCE[0]}" || ${BASH_SOURCE[0]})" )" &> /dev/null && pwd )
 
 # Load config
 if [ -e "$config_file" ]; then
@@ -596,12 +596,12 @@ if [ -e "$config_file" ]; then
     line="${line/\$HOME/$HOME}"
 
     case $line in
-      vault_dir=*) [ -z "$OVERTAKE_VAULT_DIR" ] && OVERTAKE_VAULT_DIR="${line#vault_dir=}" ;;
-      recipients=*) [ -z "$OVERTAKE_RECIPIENTS" ] && OVERTAKE_RECIPIENTS="${line#recipients=}" ;;
-      sync_git=*) [ -z "$OVERTAKE_SYNC_GIT" ] && OVERTAKE_SYNC_GIT="${line#sync_git=}" ;;
-      vimrc_overtake=*) [ -z "$OVERTAKE_VIMRC" ] && OVERTAKE_VIMRC="${line#vimrc_overtake=}" ;;
-      extensions=*) [ -z "$OVERTAKE_EXTENSIONS" ] && OVERTAKE_EXTENSIONS="${line#extensions=}" ;;
-      clear_clipboard_seconds=*) [ -z "$OVERTAKE_CLEAR_CLIPBOARD_SECONDS" ] && OVERTAKE_CLEAR_CLIPBOARD_SECONDS="${line#clear_clipboard_seconds=}" ;;
+      vault_dir=*) [ -z "$VAULT_DIR" ] && VAULT_DIR="${line#vault_dir=}" ;;
+      recipients=*) [ -z "$RECIPIENTS" ] && RECIPIENTS="${line#recipients=}" ;;
+      sync_git=*) [ -z "$SYNC_GIT" ] && SYNC_GIT="${line#sync_git=}" ;;
+      vimrc_overtake=*) [ -z "$VIMRC" ] && VIMRC="${line#vimrc_overtake=}" ;;
+      extensions=*) [ -z "$EXTENSIONS" ] && EXTENSIONS="${line#extensions=}" ;;
+      clear_clipboard_seconds=*) [ -z "$CLEAR_CLIPBOARD_SECONDS" ] && CLEAR_CLIPBOARD_SECONDS="${line#clear_clipboard_seconds=}" ;;
       *)
         echo "Warning: Unknown setting $line in $config_file"
       ;;
@@ -610,20 +610,20 @@ if [ -e "$config_file" ]; then
 fi
 
 # Set defaults if no environment variables found or values not set in config file
-[ -z "$OVERTAKE_VAULT_DIR" ] && OVERTAKE_VAULT_DIR="$default_vault_dir"
-[ -z "$OVERTAKE_RECIPIENTS" ] && OVERTAKE_RECIPIENTS="your@gpg.key"
-[ -z "$OVERTAKE_SYNC_GIT" ] && OVERTAKE_SYNC_GIT="no"
-[ -z "$OVERTAKE_VIMRC" ] && OVERTAKE_VIMRC="$OVERTAKE_DIR/vimrc_overtake"
-[ -z "$OVERTAKE_EXTENSIONS" ] && OVERTAKE_EXTENSIONS="$OVERTAKE_DIR/extensions.sh"
-[ -z "$OVERTAKE_CLEAR_CLIPBOARD_SECONDS" ] && OVERTAKE_CLEAR_CLIPBOARD_SECONDS="45"
+[ -z "$VAULT_DIR" ] && VAULT_DIR="$default_vault_dir"
+[ -z "$RECIPIENTS" ] && RECIPIENTS="your@gpg.key"
+[ -z "$SYNC_GIT" ] && SYNC_GIT="no"
+[ -z "$VIMRC" ] && VIMRC="$DIR/vimrc_overtake"
+[ -z "$EXTENSIONS" ] && EXTENSIONS="$DIR/extensions.sh"
+[ -z "$CLEAR_CLIPBOARD_SECONDS" ] && CLEAR_CLIPBOARD_SECONDS="45"
 
 # Load extensions
-[ -e "$OVERTAKE_EXTENSIONS" ] && source "$OVERTAKE_EXTENSIONS"
+[ -e "$EXTENSIONS" ] && source "$EXTENSIONS"
 
 # Remove any trailing slash
-OVERTAKE_VAULT_DIR="${OVERTAKE_VAULT_DIR%/}"
+VAULT_DIR="${VAULT_DIR%/}"
 
-[ -d "$OVERTAKE_VAULT_DIR" ] || error "No directory at $OVERTAKE_VAULT_DIR"
+[ -d "$VAULT_DIR" ] || error "No directory at $VAULT_DIR"
 
 # Set mode
 if [ $# -eq 0 ]; then
