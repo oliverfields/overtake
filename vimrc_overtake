@@ -14,9 +14,13 @@ function GPGEncryptBuffer()
   " gpg encrypt buffer to disk
   echomsg system("gpg " . recipients . " --encrypt > " . shellescape($GPG_ENCRYPTED_FILE), buffer)
 
-  " Quit, without saving buffer to disk
-  q!
-
+  if v:shell_error != 0
+    echomsg 'Error encrypting or saving file'
+    call delete(fnameescape($GPG_ENCRYPTED_FILE))
+  else
+    " Quit, without saving buffer to disk
+    q!
+  endif
 endfunction
 
 
