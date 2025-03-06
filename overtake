@@ -51,6 +51,13 @@ error()
 }
 
 
+# Print warning
+warning()
+{
+  echo -e "Warning: $*" >&2
+}
+
+
 # Print help
 help()
 {
@@ -308,8 +315,8 @@ list_recipients()
     actual_recipients="$(get_gpg_file_recipients "$file")"
     configured_recipients="$(get_configured_recipients "$file")"
 
-    [ "$actual_recipients" = "" ] && error "No recipients found in $file"
-    [ "$configured_recipients" = "" ] && error "No recipients configured for $file"
+    [ "$actual_recipients" = "" ] && warning "No recipients found in $file"
+    [ "$configured_recipients" = "" ] && warning "No recipients configured for $file"
 
     file_name="${file#$VAULT_DIR/}"
     file_name="${file_name%.gpg}"

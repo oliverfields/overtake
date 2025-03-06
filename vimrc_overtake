@@ -63,3 +63,6 @@ cmap q q!
 " Disable default start screen info
 set shm+=I
 
+" Enable backspace
+set backspace=indent,eol,start
+
