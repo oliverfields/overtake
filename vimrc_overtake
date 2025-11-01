@@ -16,7 +16,7 @@ function GPGEncryptBuffer()
 
   if v:shell_error != 0
     echomsg 'Error encrypting or saving file'
-    call delete(fnameescape($GPG_ENCRYPTED_FILE))
+    "call delete(fnameescape($GPG_ENCRYPTED_FILE))
   else
     " Quit, without saving buffer to disk
     q!
