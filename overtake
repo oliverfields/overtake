@@ -82,6 +82,9 @@ The argument [file] is optional, if not specified a file selection dialogue will
 	\e[1mcopy\e[0m <file>
 		Default select file from list and copy decrypted contents to terminal
 
+	\e[1mdelete\e[0m <file>
+		Delete file
+
 	\e[1medit\e[0m [file]
 		Decrypt file, open in vim for editing and encrypt contents back to <file>, decrypted exists only in memory, it is not written to disk
 
@@ -133,6 +136,7 @@ usage()
 	         [file]
 	         \e[1madd\e[0m <file> [-|/dev/stdin]
 	         \e[1mcopy\e[0m <file>
+	         \e[1mdelete\e[0m <file>
 	         \e[1medit\e[0m [file]
 	         \e[1mgit\e[0m [--commit-push-all|--list-repositories|--pull-all]
 	         \e[1mhelp\e[1m
@@ -547,6 +551,18 @@ show()
 }
 
 
+# Delete
+delete()
+{
+  file="$(absolute_file_path $1)"
+  if [ -f "$file" ]; then
+    rm "$file"
+  else
+    error "File $file not found"
+  fi
+}
+
+
 # Decrypt and copy to terminal
 copy()
 {
@@ -708,6 +724,12 @@ case $mode in
       2) show "$2" ;;
       3) show "$2" "$3" ;;
       *) usage ;;
+    esac
+  ;;
+  delete)
+    case $# in
+      2) delete "$2" ;;
+      1|*) usage ;;
     esac
   ;;
   git)
