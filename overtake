@@ -100,7 +100,7 @@ The argument [file] is optional, if not specified a file selection dialogue will
 		--pull-all
 			Manually trigger pulls on all git repositories in vault
 
-	\e[1mlist\e[0m [--absolute|--pretty]
+	\e[1mlist\e[0m [--absolute|--pretty|--age]
 		List .gpg files in $VAULT_DIR, defaults to tree view
 
 		--absoulte
@@ -140,7 +140,7 @@ usage()
 	         \e[1medit\e[0m [file]
 	         \e[1mgit\e[0m [--commit-push-all|--list-repositories|--pull-all]
 	         \e[1mhelp\e[1m
-	         \e[1mlist\e[0m [--absolute|--pretty]
+	         \e[1mlist\e[0m [--absolute|--pretty|--age]
 	         \e[1mrecipients\e[0m [--sync]
 	         \e[1mshow\e[0m [--no-clear|-n] [file]"
   exit 1

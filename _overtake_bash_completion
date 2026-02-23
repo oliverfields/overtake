@@ -45,7 +45,7 @@ _overtake_complete()
   prev=${COMP_WORDS[COMP_CWORD-1]}
 
   if [ $COMP_CWORD -eq 1 ]; then
-    COMPREPLY=( $(compgen -W "add copy edit recipients git help list show" -- $cur) )
+    COMPREPLY=( $(compgen -W "add copy delete edit recipients git help list show" -- $cur) )
     _overtake_complete_entries
   elif [ $COMP_CWORD -gt 1 ]; then
     case $mode in
